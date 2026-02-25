@@ -124,23 +124,32 @@ export default function LiveTracker() {
     const startCamera = useCallback(async () => {
         stopCamera();
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+            const constraints = {
                 video: {
                     facingMode: facingModeRef.current,
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
+                    width: { ideal: 1280, min: 640 },
+                    height: { ideal: 720, min: 360 },
                 },
-                audio: true,
-            });
+                audio: false, // Audio for voice is handled separately via SpeechRecognition API
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             streamRef.current = stream;
+
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                videoRef.current.addEventListener("loadeddata", predictWebcam);
+                // Explicitly call play() — essential for Safari mobile
+                try {
+                    await videoRef.current.play();
+                } catch (e) {
+                    console.warn("Autoplay blocked, waiting for interaction", e);
+                }
             }
-        } catch {
-            addToast("Erreur d'accès à la caméra.", "error");
+        } catch (err) {
+            console.error("Camera access error:", err);
+            addToast("Impossible d'accéder à la caméra. Vérifie les permissions.", "error");
         }
-    }, [stopCamera, predictWebcam, addToast]);
+    }, [stopCamera, addToast]);
 
     /* ─── Buffer capture (1 fps) ─── */
     const captureFrameToBuffer = useCallback(() => {
@@ -425,10 +434,20 @@ export default function LiveTracker() {
                 </div>
             )}
 
-            <video ref={videoRef} className="hidden" playsInline autoPlay muted />
+            <video
+                ref={videoRef}
+                className="hidden"
+                playsInline
+                autoPlay
+                muted
+                onLoadedMetadata={() => {
+                    // Start detection once metadata (size) is known
+                    predictWebcam();
+                }}
+            />
             <canvas
                 ref={canvasRef}
-                className="absolute top-0 left-0 w-full h-full object-contain bg-black"
+                className="absolute inset-0 w-full h-full object-contain bg-black"
             />
 
             {/* HUD Top - Score + Jump Counter */}
@@ -462,8 +481,8 @@ export default function LiveTracker() {
             <button
                 onClick={() => setAutoFeedback(!autoFeedback)}
                 className={`absolute top-20 right-4 z-10 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition ${autoFeedback
-                        ? "bg-orange-600/80 text-white"
-                        : "glass text-neutral-400 border border-neutral-700"
+                    ? "bg-orange-600/80 text-white"
+                    : "glass text-neutral-400 border border-neutral-700"
                     }`}
             >
                 Auto IA {autoFeedback ? "ON" : "OFF"}
