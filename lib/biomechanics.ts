@@ -11,6 +11,8 @@ export interface Landmark {
     visibility?: number;
 }
 
+export type ShotPhase = "IDLE" | "DIP" | "SET" | "RELEASE" | "FOLLOW_THROUGH";
+
 /**
  * Calculates the angle at point B formed by line segments BA and BC.
  */
@@ -173,4 +175,46 @@ export function getPoseScore(landmarks: Landmark[]): number {
     else if (tilt > 0.05) score -= 5;
 
     return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Detects the current phase of the shooting motion.
+ */
+export function getShotPhase(landmarks: Landmark[]): ShotPhase {
+    if (!landmarks || landmarks.length < 33) return "IDLE";
+
+    const rightHanded = isRightHanded(landmarks);
+    const wrist = landmarks[rightHanded ? 16 : 15];
+    const nose = landmarks[0];
+    const leftHip = landmarks[23];
+    const leftKnee = landmarks[25];
+    const leftAnkle = landmarks[27];
+    const rightHip = landmarks[24];
+    const rightKnee = landmarks[26];
+    const rightAnkle = landmarks[28];
+
+    const kneeAngle = (calculateAngle(leftHip, leftKnee, leftAnkle) + calculateAngle(rightHip, rightKnee, rightAnkle)) / 2;
+
+    // Logic for phases
+    if (kneeAngle < 140 && wrist.y > landmarks[12].y) return "DIP";
+    if (wrist.y < nose.y && wrist.y > (nose.y - 0.1)) return "SET";
+    if (wrist.y < (nose.y - 0.15)) return "RELEASE";
+    if (kneeAngle > 165 && wrist.y > nose.y && wrist.y < landmarks[12].y) return "FOLLOW_THROUGH";
+
+    return "IDLE";
+}
+
+/**
+ * Calculates stability based on shoulder and hip alignment.
+ * 0 = unstable, 100 = perfectly balanced.
+ */
+export function getStabilityScore(landmarks: Landmark[]): number {
+    if (!landmarks || landmarks.length < 33) return 0;
+
+    const shoulderDiff = Math.abs(landmarks[11].y - landmarks[12].y);
+    const hipDiff = Math.abs(landmarks[23].y - landmarks[24].y);
+
+    // Penalize differences in height (tilt)
+    const score = 100 - (shoulderDiff * 800) - (hipDiff * 500);
+    return Math.max(0, Math.min(100, Math.round(score)));
 }

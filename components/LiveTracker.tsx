@@ -5,7 +5,23 @@ import { Mic, Square, Circle, RefreshCcw, Activity, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToastStore } from "@/store/toastStore";
 import { motion } from "framer-motion";
-import { getPostureFeedback, getPoseScore, type Landmark } from "@/lib/biomechanics";
+import {
+    getPostureFeedback,
+    getPoseScore,
+    getShotPhase,
+    getStabilityScore,
+    type ShotPhase,
+    type Landmark
+} from "@/lib/biomechanics";
+
+type Particle = {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    life: number;
+    color: string;
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -38,6 +54,10 @@ export default function LiveTracker() {
     const [autoFeedback, setAutoFeedback] = useState(true);
     const [userTranscript, setUserTranscript] = useState("");
     const [ghostMode, setGhostMode] = useState(false);
+    const [currentPhase, setCurrentPhase] = useState<ShotPhase>("IDLE");
+    const [stabilityScore, setStabilityScore] = useState(100);
+    const [errorHistory, setErrorHistory] = useState<string[]>([]);
+    const particlesRef = useRef<Particle[]>([]);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const recordedChunks = useRef<BlobPart[]>([]);
@@ -90,6 +110,12 @@ export default function LiveTracker() {
                 const lm = result.landmarks[0];
 
                 if (drawingUtilsRef.current && poseConnectionsRef.current) {
+                    const ctx = canvasRef.current!.getContext("2d")!;
+
+                    // --- Neon Glow Style ---
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = "#00FF88";
+
                     drawingUtilsRef.current.drawLandmarks(lm, {
                         radius: 3,
                         color: "#FF6B35",
@@ -99,6 +125,9 @@ export default function LiveTracker() {
                         poseConnectionsRef.current,
                         { color: "#00FF88", lineWidth: 3 },
                     );
+
+                    // Reset shadow for performance
+                    ctx.shadowBlur = 0;
 
                     /* Ghost Mode - Reference Skeleton Overlay */
                     if (ghostMode) {
@@ -118,6 +147,12 @@ export default function LiveTracker() {
                     }
                 }
 
+                /* Biomechanics updates */
+                const phase = getShotPhase(lm as Landmark[]);
+                const stability = getStabilityScore(lm as Landmark[]);
+                setCurrentPhase(phase);
+                setStabilityScore(stability);
+
                 /* Jump/shot counter */
                 const avgHipY = (lm[23].y + lm[24].y) / 2;
                 if (avgHipY > 0.75 && !isDippingRef.current) {
@@ -128,19 +163,50 @@ export default function LiveTracker() {
                     isDippingRef.current = false;
                 }
 
-                /* Pose score */
                 const score = getPoseScore(lm as Landmark[]);
                 setPoseScore(score);
 
                 /* Edge posture feedback — instant spoken alerts */
                 const feedback = getPostureFeedback(lm as Landmark[]);
-                if (feedback) triggerEdgeAudio(feedback);
+                if (feedback && autoFeedback) {
+                    triggerEdgeAudio(feedback);
+
+                    // --- Proactive Coaching Logic ---
+                    setErrorHistory((prev) => {
+                        const newHistory = [...prev, feedback].slice(-5);
+                        const sameErrorCount = newHistory.filter((e) => e === feedback).length;
+                        if (sameErrorCount >= 3) {
+                            triggerEdgeAudio(`Coach: Attention, ton erreur de "${feedback.toLowerCase()}" se répète. Reste concentré sur ce mouvement.`);
+                            return []; // Reset after intervention
+                        }
+                        return newHistory;
+                    });
+                }
             }
+
+            // --- Particle System Animation ---
+            if (canvasRef.current) {
+                const ctx = canvasRef.current.getContext("2d")!;
+                particlesRef.current = particlesRef.current.filter(p => p.life > 0);
+                particlesRef.current.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.1; // gravity
+                    p.life -= 0.02;
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.globalAlpha = 1;
+            }
+
             ctx.restore();
         }
 
         requestRef.current = requestAnimationFrame(predictWebcam);
-    }, [ghostMode]); // ghostMode needed here to update the draw loop when toggled
+    }, [ghostMode, autoFeedback]); // ghostMode & autoFeedback needed for loop updates
 
     const startCamera = useCallback(async () => {
         stopCamera();
@@ -179,6 +245,23 @@ export default function LiveTracker() {
         frameBuffer.current.push(frame);
         if (frameBuffer.current.length > 10) frameBuffer.current.shift();
     }, []);
+
+    /* ─── Particles ─── */
+    const triggerParticles = () => {
+        if (!canvasRef.current) return;
+        const w = canvasRef.current.width;
+        const h = canvasRef.current.height;
+        for (let i = 0; i < 40; i++) {
+            particlesRef.current.push({
+                x: w / 2,
+                y: h / 2,
+                vx: (Math.random() - 0.5) * 20,
+                vy: (Math.random() - 0.5) * 20,
+                life: 1,
+                color: i % 2 === 0 ? "#FFD700" : "#FFA500" // Gold & Orange
+            });
+        }
+    };
 
     /* ─── Edge audio ─── */
     const triggerEdgeAudio = (message: string) => {
@@ -394,6 +477,7 @@ export default function LiveTracker() {
             if (transcript.includes("panier") || transcript.includes("swish") || transcript.includes("dedans")) {
                 setMadeShots(m => m + 1);
                 addToast("Panier enregistré ! 🏀", "success");
+                triggerParticles();
                 // Clear transcript after 3s
                 setTimeout(() => setUserTranscript(""), 3000);
             } else {
@@ -511,6 +595,28 @@ export default function LiveTracker() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Shot Phase Badge (Elite Feature) */}
+            <div className="absolute top-24 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+                <motion.div
+                    animate={{ scale: currentPhase !== "IDLE" ? 1.1 : 1 }}
+                    className={`px-4 py-1.5 rounded-full text-xs font-black tracking-tighter border transition-all ${currentPhase === "RELEASE" ? "bg-red-600 border-red-400 text-white shadow-lg shadow-red-500/50" :
+                        currentPhase === "SET" ? "bg-orange-600 border-orange-400 text-white" :
+                            currentPhase === "DIP" ? "bg-blue-600 border-blue-400 text-white" :
+                                "bg-black/40 border-white/10 text-neutral-400"
+                        }`}>
+                    {currentPhase === "IDLE" ? "PHASE : ATTENTE" : `PHASE : ${currentPhase}`}
+                </motion.div>
+
+                {/* Stability Meter */}
+                <div className="w-32 h-1 bg-white/10 rounded-full overflow-hidden mt-1 backdrop-blur-sm border border-white/5">
+                    <motion.div
+                        animate={{ width: `${stabilityScore}%`, backgroundColor: stabilityScore > 80 ? "#22c55e" : stabilityScore > 50 ? "#eab308" : "#ef4444" }}
+                        className="h-full transition-all duration-300"
+                    />
+                </div>
+                <span className="text-[8px] text-white/40 font-bold tracking-widest uppercase">Stability {stabilityScore}%</span>
             </div>
 
             {/* Ghost Mode & Auto-feedback Toggles */}
