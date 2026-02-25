@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Mic, Square, Circle, RefreshCcw, Activity, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToastStore } from "@/store/toastStore";
+import { motion } from "framer-motion";
 import { getPostureFeedback, getPoseScore, type Landmark } from "@/lib/biomechanics";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -32,8 +33,11 @@ export default function LiveTracker() {
     const [isReady, setIsReady] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [jumpCount, setJumpCount] = useState(0);
+    const [madeShots, setMadeShots] = useState(0);
     const [poseScore, setPoseScore] = useState(0);
     const [autoFeedback, setAutoFeedback] = useState(true);
+    const [userTranscript, setUserTranscript] = useState("");
+    const [ghostMode, setGhostMode] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const recordedChunks = useRef<BlobPart[]>([]);
@@ -95,6 +99,23 @@ export default function LiveTracker() {
                         poseConnectionsRef.current,
                         { color: "#00FF88", lineWidth: 3 },
                     );
+
+                    /* Ghost Mode - Reference Skeleton Overlay */
+                    if (ghostMode) {
+                        // We shift the reference points slightly or draw them in a fixed "ideal" position
+                        // For a real "ideal" reference, we'd need a recorded professional sequence, 
+                        // but here we'll draw a slightly transparent "perfection" overlay based on user scale.
+                        const ghostLm = lm.map((p: any) => ({
+                            ...p,
+                            x: p.x + 0.02, // Offset slightly to see the difference
+                            y: p.y - 0.05, // Slightly higher/straighter
+                        }));
+                        drawingUtilsRef.current.drawConnectors(
+                            ghostLm,
+                            poseConnectionsRef.current,
+                            { color: "rgba(255, 255, 255, 0.3)", lineWidth: 2 },
+                        );
+                    }
                 }
 
                 /* Jump/shot counter */
@@ -119,7 +140,7 @@ export default function LiveTracker() {
         }
 
         requestRef.current = requestAnimationFrame(predictWebcam);
-    }, []);
+    }, [ghostMode]); // ghostMode needed here to update the draw loop when toggled
 
     const startCamera = useCallback(async () => {
         stopCamera();
@@ -365,9 +386,19 @@ export default function LiveTracker() {
         rec.maxAlternatives = 1;
         rec.onstart = () => setIsListening(true);
         rec.onresult = async (e: any) => {
-            const transcript = e.results[0][0].transcript;
+            const transcript = e.results[0][0].transcript.toLowerCase();
             setIsListening(false);
-            await sendToGemini(transcript);
+            setUserTranscript(transcript);
+
+            // Check for success commands
+            if (transcript.includes("panier") || transcript.includes("swish") || transcript.includes("dedans")) {
+                setMadeShots(m => m + 1);
+                addToast("Panier enregistré ! 🏀", "success");
+                // Clear transcript after 3s
+                setTimeout(() => setUserTranscript(""), 3000);
+            } else {
+                await sendToGemini(transcript);
+            }
         };
         rec.onerror = (e: any) => {
             setIsListening(false);
@@ -466,27 +497,57 @@ export default function LiveTracker() {
 
                 <div className="glass border border-neutral-700 px-4 py-2 rounded-2xl flex items-center gap-2">
                     <Activity className="text-orange-500 w-5 h-5" />
-                    <div>
+                    <div className="flex flex-col">
                         <span className="text-[10px] text-neutral-400 font-bold uppercase block">
-                            Tirs
+                            Stats
                         </span>
-                        <span className="text-xl font-black text-white leading-none">
-                            {jumpCount}
-                        </span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-xl font-black text-white leading-none">
+                                {madeShots}
+                            </span>
+                            <span className="text-[10px] text-neutral-500 font-bold">
+                                /{jumpCount}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Auto-feedback toggle */}
-            <button
-                onClick={() => setAutoFeedback(!autoFeedback)}
-                className={`absolute top-20 right-4 z-10 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition ${autoFeedback
-                    ? "bg-orange-600/80 text-white"
-                    : "glass text-neutral-400 border border-neutral-700"
-                    }`}
-            >
-                Auto IA {autoFeedback ? "ON" : "OFF"}
-            </button>
+            {/* Ghost Mode & Auto-feedback Toggles */}
+            <div className="absolute top-20 right-4 z-10 flex flex-col gap-2 items-end">
+                <button
+                    onClick={() => setAutoFeedback(!autoFeedback)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition ${autoFeedback
+                        ? "bg-orange-600/80 text-white"
+                        : "glass text-neutral-400 border border-neutral-700"
+                        }`}
+                >
+                    Auto IA {autoFeedback ? "ON" : "OFF"}
+                </button>
+                <button
+                    onClick={() => setGhostMode(!ghostMode)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition ${ghostMode
+                        ? "bg-purple-600/80 text-white shadow-lg shadow-purple-500/30"
+                        : "glass text-neutral-400 border border-neutral-700"
+                        }`}
+                >
+                    Ghost Mode {ghostMode ? "ON" : "OFF"}
+                </button>
+            </div>
+
+            {/* Visual Transcript */}
+            {userTranscript && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 text-white text-center"
+                    >
+                        <p className="text-xs text-neutral-400 uppercase font-black tracking-widest mb-1">Tu as dit</p>
+                        <p className="text-lg font-bold">&quot;{userTranscript}&quot;</p>
+                    </motion.div>
+                </div>
+            )}
 
             {/* AI response overlay */}
             {aiResponse && (

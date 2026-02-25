@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
         // --- Gemini Vision call ---
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-pro-preview-05-06",
+            model: "gemini-1.5-pro",
         });
 
         const imageParts = frames.map((frameBase64: string) => {
