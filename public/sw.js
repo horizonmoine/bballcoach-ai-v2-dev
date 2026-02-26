@@ -1,4 +1,4 @@
-const CACHE_NAME = "bballcoach-v1";
+const CACHE_NAME = "bballcoach-v2";
 const STATIC_ASSETS = [
     "/",
     "/manifest.json",

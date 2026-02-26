@@ -12,6 +12,7 @@ import {
     BookOpen,
     User as UserIcon,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const navItems = [
     { name: "Accueil", path: "/", icon: Home },
@@ -65,9 +66,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
     return (
         <>
-            <main className={`flex-1 overflow-y-auto no-scrollbar ${!isAuthPage && !isLivePage ? "pb-20" : ""}`}>
-                {children}
-            </main>
+            <AnimatePresence mode="wait">
+                <motion.main
+                    key={pathname}
+                    initial={{ opacity: 0, x: isAuthPage ? 0 : 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: isAuthPage ? 0 : -10 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className={`flex-1 overflow-y-auto no-scrollbar ${!isAuthPage && !isLivePage ? "pb-20" : ""}`}
+                >
+                    {children}
+                </motion.main>
+            </AnimatePresence>
 
             {/* Mobile bottom tab bar */}
             {user && !isAuthPage && !isLivePage && (
@@ -81,19 +91,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                                     <Link
                                         href={item.path}
                                         className={`flex flex-col items-center justify-center w-16 h-14 rounded-2xl transition-all ${isActive
-                                                ? "text-orange-500"
-                                                : "text-neutral-500 active:text-neutral-300"
+                                            ? "text-orange-500"
+                                            : "text-neutral-500 active:text-neutral-300"
                                             }`}
                                     >
-                                        <Icon
-                                            size={22}
-                                            strokeWidth={isActive ? 2.5 : 1.5}
-                                        />
+                                        <motion.div
+                                            animate={isActive ? { scale: [1, 1.2, 1] } : {}}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <Icon
+                                                size={22}
+                                                strokeWidth={isActive ? 2.5 : 1.5}
+                                            />
+                                        </motion.div>
                                         <span className="text-[10px] font-bold mt-1 tracking-tight">
                                             {item.name}
                                         </span>
                                         {isActive && (
-                                            <div className="w-5 h-0.5 bg-orange-500 rounded-full mt-0.5" />
+                                            <motion.div
+                                                layoutId="navTab"
+                                                className="w-5 h-0.5 bg-orange-500 rounded-full mt-0.5"
+                                            />
                                         )}
                                     </Link>
                                 </li>
