@@ -151,7 +151,7 @@ export default function AnalyzePage() {
     };
 
     return (
-        <div className="min-h-full bg-neutral-950 text-white px-4 pt-6 pb-4">
+        <div className="min-h-full bg-background text-white px-4 pt-6 pb-4">
             <video ref={videoRef} className="hidden" crossOrigin="anonymous" />
             <canvas ref={canvasRef} width={640} height={360} className="hidden" />
 
@@ -164,7 +164,7 @@ export default function AnalyzePage() {
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 mb-6"
+                className="glass-panel p-5 mb-6"
             >
                 <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-neutral-700 rounded-xl cursor-pointer active:bg-neutral-800 transition">
                     <UploadCloud className="w-10 h-10 text-neutral-400 mb-3" />
@@ -235,7 +235,7 @@ export default function AnalyzePage() {
                         ))}
                     </div>
                 ) : uploads.length === 0 ? (
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 text-center">
+                    <div className="glass-panel p-8 text-center">
                         <UploadCloud className="w-10 h-10 text-neutral-700 mx-auto mb-3" />
                         <p className="text-sm text-neutral-500">
                             Aucune analyse encore. Upload ta première vidéo !
@@ -248,7 +248,7 @@ export default function AnalyzePage() {
                                 key={upload.id}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden"
+                                className="glass-panel overflow-hidden"
                             >
                                 <button
                                     onClick={() =>

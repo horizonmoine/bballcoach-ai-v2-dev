@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Mic, Square, Bot, Loader2 } from "lucide-react";
+import { X, Mic, Square, Bot } from "lucide-react";
 import VoiceWaveIndicator from "./VoiceWaveIndicator";
 
 export type VoiceStatus = "idle" | "listening" | "analyzing" | "responding" | "cooldown";
@@ -138,7 +138,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                         <div className="min-h-[60px] p-4 bg-white/5 rounded-2xl border border-white/5">
                             {finalTranscript ? (
                                 <p className="text-sm font-medium text-white/90 leading-relaxed italic">
-                                    "{finalTranscript}"
+                                    &quot;{finalTranscript}&quot;
                                 </p>
                             ) : interimTranscript ? (
                                 <p className="text-sm font-medium text-white/40 leading-relaxed italic">

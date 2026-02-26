@@ -118,14 +118,14 @@ export default function ProfilePage() {
     };
 
     return (
-        <div className="min-h-full bg-neutral-950 text-white px-4 pt-6 pb-4">
+        <div className="min-h-full bg-background text-white px-4 pt-6 pb-4">
             <h1 className="text-2xl font-black mb-6">Mon Profil</h1>
 
             {/* Avatar + Name */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 mb-4"
+                className="glass-panel p-6 mb-4"
             >
                 <div className="flex items-center gap-4 mb-4">
                     <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-600 to-orange-400 flex items-center justify-center">
@@ -188,7 +188,7 @@ export default function ProfilePage() {
                 transition={{ delay: 0.1 }}
                 className="grid grid-cols-3 gap-3 mb-4"
             >
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-center">
+                <div className="glass-panel p-4 text-center">
                     <Activity className="w-5 h-5 text-orange-500 mx-auto mb-2" />
                     <p className="text-xl font-black">
                         {loading ? (
@@ -201,7 +201,7 @@ export default function ProfilePage() {
                         Sessions
                     </p>
                 </div>
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-center">
+                <div className="glass-panel p-4 text-center">
                     <Clock className="w-5 h-5 text-blue-500 mx-auto mb-2" />
                     <p className="text-xl font-black">
                         {loading ? (
@@ -214,7 +214,7 @@ export default function ProfilePage() {
                         Temps
                     </p>
                 </div>
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-center">
+                <div className="glass-panel p-4 text-center">
                     <Upload className="w-5 h-5 text-green-500 mx-auto mb-2" />
                     <p className="text-xl font-black">
                         {loading ? (
@@ -238,7 +238,7 @@ export default function ProfilePage() {
             >
                 <button
                     onClick={resetPassword}
-                    className="w-full flex items-center gap-4 bg-neutral-900 border border-neutral-800 rounded-2xl p-4 active:bg-neutral-800 transition"
+                    className="w-full flex items-center gap-4 glass-panel p-4 hover-lift transition"
                 >
                     <Shield className="w-5 h-5 text-blue-500" />
                     <span className="font-bold text-sm">
@@ -248,7 +248,7 @@ export default function ProfilePage() {
 
                 <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-4 bg-neutral-900 border border-red-900/30 rounded-2xl p-4 active:bg-red-900/20 transition"
+                    className="w-full flex items-center gap-4 glass-panel border-red-900/30 p-4 hover-lift transition"
                 >
                     <LogOut className="w-5 h-5 text-red-500" />
                     <span className="font-bold text-sm text-red-500">

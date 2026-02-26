@@ -168,7 +168,7 @@ export default function SessionsPage() {
     };
 
     return (
-        <div className="min-h-full bg-neutral-950 text-white px-4 pt-6 pb-4">
+        <div className="min-h-full bg-background text-white px-4 pt-6 pb-4">
             <video ref={hiddenVideoRef} className="hidden" muted playsInline />
             <canvas
                 ref={hiddenCanvasRef}
@@ -186,7 +186,7 @@ export default function SessionsPage() {
                         Tes sessions live enregistrées
                     </p>
                 </div>
-                <div className="bg-neutral-900 px-3 py-1.5 rounded-xl border border-neutral-800">
+                <div className="glass-panel px-3 py-1.5 rounded-xl">
                     <span className="text-xs text-neutral-400 font-bold">
                         {sessions.length} session{sessions.length !== 1 && "s"}
                     </span>
@@ -200,7 +200,7 @@ export default function SessionsPage() {
                     ))}
                 </div>
             ) : sessions.length === 0 ? (
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-10 text-center">
+                <div className="glass-panel p-10 text-center">
                     <Video className="w-12 h-12 text-neutral-700 mx-auto mb-3" />
                     <h2 className="text-lg font-bold text-neutral-300 mb-1">
                         Aucune session
@@ -220,7 +220,7 @@ export default function SessionsPage() {
                         <motion.div
                             key={session.id}
                             variants={item}
-                            className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden"
+                            className="glass-panel overflow-hidden"
                         >
                             {/* Video */}
                             <video
@@ -286,7 +286,7 @@ export default function SessionsPage() {
                             {expandedId === session.id && (
                                 <div className="px-4 pb-4">
                                     {session.ai_feedback_summary ? (
-                                        <p className="text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed bg-neutral-950 rounded-xl p-4 border border-neutral-800 max-h-60 overflow-y-auto">
+                                        <p className="text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed glass-panel p-4 max-h-60 overflow-y-auto">
                                             {session.ai_feedback_summary}
                                         </p>
                                     ) : (

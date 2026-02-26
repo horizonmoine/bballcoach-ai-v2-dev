@@ -253,6 +253,7 @@ export default function LiveTracker() {
     // --- Omniscience Refs ---
     const particlesRef = useRef<Particle[]>([]);
     const prevLandmarksRef = useRef<Landmark[] | null>(null);
+    const emaLandmarksRef = useRef<Landmark[] | null>(null);
     const lastFrameTimeRef = useRef<number>(0);
     const airtimeStartRef = useRef<number | null>(null);
     const initialHipYRef = useRef<number | null>(null);
@@ -403,7 +404,7 @@ export default function LiveTracker() {
                 },
                 body: JSON.stringify({
                     prompt: question,
-                    frames: frameBuffer.current,
+                    frames: frameBuffer.current.slice(-5), // V13: limit to max 5 to reduce wait time
                     metrics: {
                         stabilityScore: Math.round(emaRef.current.stability),
                         explosivity: Math.round(emaRef.current.explosivity),
@@ -415,6 +416,7 @@ export default function LiveTracker() {
                         madeShots: madeShots,
                     },
                     history: chatHistoryRef.current.slice(-10),
+                    coachPersona: coachPersona,
                 }),
             });
             const data = await res.json();
@@ -453,7 +455,7 @@ export default function LiveTracker() {
         } finally {
             setIsAnalyzing(false);
         }
-    }, [coachLanguage, maxJump, airtime, releaseAngle, kneeBendDepth, shotCount, madeShots, processSpeechQueue, setGhostMode, setCoachPersona, triggerEdgeAudio, addToast]);
+    }, [coachLanguage, coachPersona, maxJump, airtime, releaseAngle, kneeBendDepth, shotCount, madeShots, processSpeechQueue, setGhostMode, setCoachPersona, triggerEdgeAudio, addToast]);
 
     // --- V12: Proactive Event-Triggered Coaching ---
     const triggerProactiveCoaching = useCallback((event: "bad_shot" | "record_jump" | "idle_too_long") => {
@@ -509,7 +511,25 @@ export default function LiveTracker() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             if (results.landmarks && results.landmarks.length > 0) {
-                const lm = results.landmarks[0] as Landmark[];
+                const rawLm = results.landmarks[0] as Landmark[];
+
+                // Universal EMA Landmark Smoothing (V14)
+                const SMOOTH_FACTOR = 0.5; // 50% new frame, 50% history = buttery smooth tracking
+                if (emaLandmarksRef.current) {
+                    emaLandmarksRef.current = rawLm.map((pt, i) => {
+                        const prev = emaLandmarksRef.current![i];
+                        return {
+                            x: prev.x + (pt.x - prev.x) * SMOOTH_FACTOR,
+                            y: prev.y + (pt.y - prev.y) * SMOOTH_FACTOR,
+                            z: pt.z !== undefined && prev.z !== undefined ? prev.z + (pt.z - prev.z) * SMOOTH_FACTOR : pt.z,
+                            visibility: pt.visibility
+                        };
+                    });
+                } else {
+                    emaLandmarksRef.current = [...rawLm];
+                }
+                const lm = emaLandmarksRef.current;
+
                 const w = canvas.width;
                 const h = canvas.height;
                 const dt = nowMs - (lastFrameTimeRef.current || nowMs);
@@ -662,7 +682,14 @@ export default function LiveTracker() {
                         ctx.lineTo(p2.x * w, p2.y * h);
                         ctx.stroke();
                     });
-                    drawingUtilsRef.current.drawLandmarks(lm, { color: "#f97316", radius: 2 });
+
+                    // Premium Skeleton Joints
+                    drawingUtilsRef.current.drawLandmarks(lm, {
+                        color: "rgba(255, 255, 255, 0.9)",
+                        fillColor: "rgba(59, 130, 246, 0.8)", // Blue inner dot
+                        lineWidth: 2,
+                        radius: 3
+                    });
 
                     // V12: Color-Coded Angle Labels at Key Joints
                     const drawAngleLabel = (a: Landmark, b: Landmark, c: Landmark, idealMin: number, idealMax: number) => {
@@ -918,7 +945,8 @@ export default function LiveTracker() {
                             kneeBendDepth: kneeBendDepth,
                             shotCount: shotCount,
                             madeShots: madeShots,
-                        }
+                        },
+                        coachPersona: coachPersona,
                     }),
                 });
                 const data = await res.json();
@@ -949,7 +977,7 @@ export default function LiveTracker() {
                 // Silent fail for auto feedback
             }
         }, 30000);
-    }, [coachLanguage, autoFeedback, isVoiceModalOpen, maxJump, airtime, releaseAngle, kneeBendDepth, shotCount, madeShots, processSpeechQueue, setGhostMode, setCoachPersona, triggerEdgeAudio]);
+    }, [autoFeedback, isVoiceModalOpen, coachLanguage, coachPersona, maxJump, airtime, releaseAngle, kneeBendDepth, shotCount, madeShots, processSpeechQueue, triggerEdgeAudio]);
 
     const stopAutoFeedback = useCallback(() => {
         if (autoFeedbackTimerRef.current) {
@@ -1288,34 +1316,34 @@ export default function LiveTracker() {
             </AnimatePresence>
 
             {/* Elite HUD Overlays */}
-            <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none p-4 flex flex-col justify-between items-stretch z-10">
+            <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none p-4 md:p-6 flex flex-col justify-between items-stretch z-10">
                 {/* Header Metrics */}
                 <div className="flex justify-between items-start">
-                    <div className="glass-modern border border-white/10 p-4 rounded-2xl flex items-center gap-6">
+                    <div className="glass-panel p-4 rounded-3xl flex items-center gap-6 shadow-2xl">
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-white/40 font-black uppercase tracking-wider">Session XP</span>
-                            <div className="flex items-center gap-2">
-                                <Flame className="text-orange-500" size={16} />
-                                <span className="text-xl font-black tabular-nums">{madeShots * 150 + shotCount * 50}</span>
+                            <span className="text-[10px] text-white/50 font-semibold uppercase tracking-wider">Session XP</span>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Flame className="text-orange-400" size={18} />
+                                <span className="text-2xl font-bold tabular-nums tracking-tight">{madeShots * 150 + shotCount * 50}</span>
                             </div>
                         </div>
-                        <div className="h-8 w-px bg-white/10" />
+                        <div className="h-10 w-px bg-white/10" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-white/40 font-black uppercase tracking-widest">Accuracy</span>
-                            <span className="text-xl font-black tabular-nums text-blue-400">
+                            <span className="text-[10px] text-white/50 font-semibold uppercase tracking-widest">Accuracy</span>
+                            <span className="text-2xl font-bold tabular-nums text-blue-400 tracking-tight mt-1">
                                 {shotCount > 0 ? Math.round((madeShots / shotCount) * 100) : 0}%
                             </span>
                         </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
-                        <div className="glass-modern border border-white/10 px-4 py-2 rounded-xl flex items-center gap-3">
-                            <Activity className="text-orange-500 animate-pulse" size={14} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{currentPhase}</span>
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <div className="flex flex-col items-end gap-3">
+                        <div className="glass-panel px-4 py-2 rounded-2xl flex items-center gap-3">
+                            <Activity className="text-orange-400 animate-pulse" size={16} />
+                            <span className="text-[11px] font-bold uppercase tracking-widest">{currentPhase}</span>
+                            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-white/40 font-black uppercase tracking-widest tabular-nums">{fpsDisplay} FPS</span>
+                            <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest tabular-nums">{fpsDisplay} FPS</span>
                             {/* V13: Handedness badge */}
                             {handedness.confidence > 60 && (
                                 <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-400">
@@ -1326,9 +1354,9 @@ export default function LiveTracker() {
                         {/* V13: Compact HUD toggle */}
                         <button
                             onClick={() => setCompactHUD(h => !h)}
-                            className="pointer-events-auto text-[8px] font-black uppercase px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white/80 transition-colors"
+                            className="pointer-events-auto text-[10px] font-semibold uppercase px-4 py-2 rounded-full glass-panel hover-lift transition-all text-white/70"
                         >
-                            {compactHUD ? "◻ Full" : "◼ Mini"}
+                            {compactHUD ? "Full Stats" : "Minimal"}
                         </button>
                     </div>
                 </div>
@@ -1341,80 +1369,80 @@ export default function LiveTracker() {
                         <motion.div
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="glass-modern border border-white/5 p-3 rounded-2xl flex items-center gap-4"
+                            className="glass-panel p-4 rounded-3xl flex items-center gap-6 shadow-xl"
                         >
                             <ScoreRing value={poseScore} color={scoreColorVal} label="Form" />
-                            <div className="h-8 w-px bg-white/10" />
+                            <div className="h-10 w-px bg-white/10" />
                             <div className="flex flex-col items-center">
-                                <span className="text-[8px] text-white/40 font-black uppercase">Shots</span>
-                                <span className="text-lg font-black text-orange-400 tabular-nums">{madeShots}/{shotCount}</span>
+                                <span className="text-[9px] text-white/50 font-semibold uppercase tracking-wider mb-1">Shots</span>
+                                <span className="text-xl font-bold text-orange-400 tabular-nums">{madeShots}/{shotCount}</span>
                             </div>
-                            <div className="h-8 w-px bg-white/10" />
+                            <div className="h-10 w-px bg-white/10" />
                             <div className="flex flex-col items-center">
-                                <span className="text-[8px] text-white/40 font-black uppercase">Phase</span>
-                                <span className="text-[10px] font-black uppercase text-blue-400">{currentPhase}</span>
+                                <span className="text-[9px] text-white/50 font-semibold uppercase tracking-wider mb-1">Phase</span>
+                                <span className="text-xs font-bold uppercase text-blue-400 tracking-wider">{currentPhase}</span>
                             </div>
                         </motion.div>
                     ) : (
                         /* ── FULL HUD ── */
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-4">
                             <motion.div
                                 initial={{ x: -20, opacity: 0 }}
                                 animate={{ x: 0, opacity: 1 }}
-                                className="glass-modern border border-white/5 p-4 rounded-2xl flex flex-col gap-4 min-w-[200px]"
+                                className="glass-panel p-5 rounded-3xl flex flex-col gap-5 min-w-[220px] shadow-2xl"
                             >
                                 {/* Elite TOP Analytics Bar inside panel */}
-                                <div className="flex items-center justify-between w-full mb-2">
+                                <div className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-2">
-                                        <Gauge className="text-orange-500" size={16} />
-                                        <span className="text-[8px] font-black uppercase tracking-widest">APEX Engine Elite</span>
+                                        <Gauge className="text-orange-400" size={18} />
+                                        <span className="text-[9px] font-semibold uppercase tracking-widest text-white/80">Core AI Engine</span>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 opacity-80">
                                         <MetricGauge label="STB" value={stabilityScore} color="blue" />
                                         <MetricGauge label="EXP" value={explosivity * 10} color="orange" />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-3 border-t border-white/5 pt-3">
+                                <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-4">
                                     <ScoreRing value={poseScore} color={scoreColorVal} label="Form" />
-                                    <ScoreRing value={symmetryScore} color="#10B981" label="Symmetry" />
+                                    <ScoreRing value={symmetryScore} color="#10B981" label="Sym" />
                                     {/* V13: Follow-Through ring */}
-                                    <ScoreRing value={followThroughScore} color="#8b5cf6" label="Follow" />
+                                    <ScoreRing value={followThroughScore} color="#8b5cf6" label="F-Thru" />
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 bg-white/5 p-3 rounded-xl">
-                                    <div className="flex flex-col">
-                                        <span className="text-[7px] text-white/40 font-black uppercase">Release</span>
-                                        <span className="text-[11px] font-black text-blue-400">{releaseAngle}°</span>
+                                <div className="grid grid-cols-3 gap-3 bg-black/20 p-3 rounded-2xl border border-white/5">
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[8px] text-white/50 font-semibold uppercase mb-1">Release</span>
+                                        <span className="text-sm font-bold text-blue-400">{releaseAngle}°</span>
                                     </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[7px] text-white/40 font-black uppercase">Depth</span>
-                                        <span className="text-[11px] font-black text-orange-400">{kneeBendDepth}°</span>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[8px] text-white/50 font-semibold uppercase mb-1">Depth</span>
+                                        <span className="text-sm font-bold text-orange-400">{kneeBendDepth}°</span>
                                     </div>
                                     {/* V13: Consistency metric */}
-                                    <div className="flex flex-col">
-                                        <span className="text-[7px] text-white/40 font-black uppercase">Consist.</span>
-                                        <span className={`text-[11px] font-black ${consistencyScore >= 80 ? 'text-green-400' : consistencyScore >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[8px] text-white/50 font-semibold uppercase mb-1">Consist.</span>
+                                        <span className={`text-sm font-bold ${consistencyScore >= 80 ? 'text-green-400' : consistencyScore >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
                                             {consistencyScore}%
                                         </span>
                                     </div>
                                 </div>
                             </motion.div>
 
-                            <div className="glass-modern border border-white/5 p-3 rounded-xl flex items-center gap-4">
+                            <div className="glass-panel p-4 rounded-2xl flex items-center gap-6 shadow-lg self-start">
                                 <div className="flex flex-col">
-                                    <span className="text-[7px] text-white/40 font-black uppercase">Max Jump</span>
+                                    <span className="text-[9px] text-white/50 font-semibold uppercase mb-1">Max Jump</span>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-sm font-black text-orange-400 tabular-nums">{maxJump}</span>
-                                        <span className="text-[8px] text-white/40 font-bold uppercase">cm</span>
+                                        <span className="text-lg font-bold text-orange-400 tabular-nums">{maxJump}</span>
+                                        <span className="text-[10px] text-white/50 font-semibold uppercase">cm</span>
                                     </div>
                                 </div>
-                                <div className="w-px h-6 bg-white/10" />
+                                <div className="w-px h-8 bg-white/10" />
                                 <div className="flex flex-col">
-                                    <span className="text-[7px] text-white/40 font-black uppercase">Airtime</span>
+                                    <span className="text-[9px] text-white/50 font-semibold uppercase mb-1">Airtime</span>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-sm font-black text-blue-400 tabular-nums">{airtime}</span>
-                                        <span className="text-[8px] text-white/40 font-bold uppercase">s</span>
+                                        <span className="text-lg font-bold text-blue-400 tabular-nums">{airtime}</span>
+                                        <span className="text-[10px] text-white/50 font-semibold uppercase">s</span>
                                     </div>
                                 </div>
                                 {/* V13: Ball indicator */}

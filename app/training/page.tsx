@@ -98,7 +98,7 @@ const colorMap: Record<string, { badge: string; border: string }> = {
 
 export default function TrainingPage() {
     return (
-        <div className="min-h-screen bg-neutral-950 text-white p-6 md:p-8">
+        <div className="min-h-screen bg-background text-white p-6 md:p-8">
             <h1 className="text-4xl font-black mb-2 text-purple-500">
                 Entraînement & Ressources
             </h1>
@@ -119,7 +119,7 @@ export default function TrainingPage() {
                             {cat.items.map((item) => (
                                 <div
                                     key={item.name}
-                                    className={`bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-xl ${colors.border}`}
+                                    className={`glass-panel overflow-hidden shadow-xl ${colors.border}`}
                                 >
                                     <div className="w-full aspect-video bg-black">
                                         <iframe

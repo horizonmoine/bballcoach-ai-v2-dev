@@ -58,7 +58,9 @@ export default function ConfettiCelebration({ trigger }: { trigger: number }) {
 
     // Trigger burst when trigger prop changes
     useEffect(() => {
-        if (trigger > 0) burst();
+        if (trigger > 0) {
+            setTimeout(burst, 0);
+        }
     }, [trigger, burst]);
 
     useEffect(() => {

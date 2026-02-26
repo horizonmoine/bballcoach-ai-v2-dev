@@ -1,6 +1,19 @@
 import type { Metadata, Viewport } from "next";
+import { Outfit, Inter } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "BballCoach AI",
@@ -34,11 +47,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
+    <html lang="fr" className={`${outfit.variable} ${inter.variable}`}>
       <head>
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </head>
-      <body className="bg-neutral-950 text-white selection:bg-orange-500 selection:text-white overscroll-none">
+      <body className="bg-[#050505] text-neutral-100 font-sans selection:bg-orange-500/30 selection:text-orange-200 overscroll-none antialiased">
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

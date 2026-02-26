@@ -14,7 +14,7 @@ const PRO_VIDEOS = [
 export default function ComparePage() {
     const [userVideo, setUserVideo] = useState<string | null>(null);
     const [proVideo, setProVideo] = useState<string | null>(null);
-    const [userFile, setUserFile] = useState<File | null>(null);
+
     const [opacity, setOpacity] = useState(50);
     const [isOverlay, setIsOverlay] = useState(false);
     const [analysisResult, setAnalysisResult] = useState("");
@@ -26,7 +26,6 @@ export default function ComparePage() {
 
     const handleUserUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
-            setUserFile(e.target.files[0]);
             setUserVideo(URL.createObjectURL(e.target.files[0]));
         }
     };
@@ -108,7 +107,7 @@ export default function ComparePage() {
     };
 
     return (
-        <div className="min-h-full bg-neutral-950 text-white px-4 pt-6 pb-4">
+        <div className="min-h-full bg-background text-white px-4 pt-6 pb-4">
             <canvas ref={canvasRef} width={640} height={360} className="hidden" />
 
             <h1 className="text-2xl font-black mb-1 text-blue-500">Comparaison</h1>
@@ -122,7 +121,7 @@ export default function ComparePage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-3 mb-6"
             >
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4">
+                <div className="glass-panel p-4">
                     <label className="block text-sm font-bold mb-2">Ta vidéo</label>
                     <input
                         type="file"
@@ -131,7 +130,7 @@ export default function ComparePage() {
                         className="block w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-neutral-800 file:text-white active:file:bg-neutral-700"
                     />
                 </div>
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4">
+                <div className="glass-panel p-4">
                     <label className="block text-sm font-bold mb-2">Vidéo Pro</label>
                     <input
                         type="file"
@@ -159,14 +158,14 @@ export default function ComparePage() {
             <div className="flex items-center gap-3 mb-4 overflow-x-auto no-scrollbar">
                 <button
                     onClick={() => setIsOverlay(!isOverlay)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-neutral-900 rounded-xl border border-neutral-800 text-sm font-bold whitespace-nowrap active:bg-neutral-800"
+                    className="flex items-center gap-2 px-4 py-2.5 glass-panel text-sm font-bold whitespace-nowrap active:bg-white/5"
                 >
                     <Layers className="w-4 h-4" />
                     {isOverlay ? "Superposition" : "Côte à Côte"}
                 </button>
 
                 {isOverlay && (
-                    <div className="flex items-center gap-3 bg-neutral-900 px-4 py-2 rounded-xl border border-neutral-800">
+                    <div className="flex items-center gap-3 glass-panel px-4 py-2">
                         <input
                             type="range"
                             min={0}
@@ -184,8 +183,7 @@ export default function ComparePage() {
 
             {/* Video display */}
             <div
-                className={`relative w-full bg-neutral-900 rounded-2xl border border-neutral-800 overflow-hidden mb-4 ${isOverlay ? "aspect-video" : ""
-                    }`}
+                className={`relative w-full glass-panel overflow-hidden mb-4 ${isOverlay ? "aspect-video" : ""}`}
             >
                 {!userVideo && !proVideo && (
                     <div className="flex items-center justify-center w-full h-48 text-neutral-600 font-medium text-sm">
@@ -262,7 +260,7 @@ export default function ComparePage() {
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-neutral-900 border border-blue-500/30 rounded-2xl overflow-hidden mb-4"
+                    className="glass-panel border-blue-500/30 overflow-hidden mb-4"
                 >
                     <button
                         onClick={() => setShowAnalysis(!showAnalysis)}

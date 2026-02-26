@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 
 interface VoiceWaveIndicatorProps {
     active: boolean;
@@ -39,7 +39,9 @@ export default function VoiceWaveIndicator({
     const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const dataArrayRef = useRef<Uint8Array | null>(null);
 
-    const dims = size === "lg" ? { w: 200, h: 60 } : size === "md" ? { w: 100, h: 36 } : { w: 60, h: 28 };
+    const dims = useMemo(() => (
+        size === "lg" ? { w: 200, h: 60 } : size === "md" ? { w: 100, h: 36 } : { w: 60, h: 28 }
+    ), [size]);
 
     // Connect Web Audio API analyser when stream is available
     useEffect(() => {
@@ -121,6 +123,7 @@ export default function VoiceWaveIndicator({
 
                 if (active && analyserRef.current && dataArrayRef.current) {
                     // Real audio data
+                    // @ts-expect-error - Web Audio API expects Uint8Array, TS type might mismatch ArrayBufferLike
                     analyserRef.current.getByteFrequencyData(dataArrayRef.current);
                     const dataLen = dataArrayRef.current.length;
                     const binIdx = Math.floor((i / barCount) * dataLen);

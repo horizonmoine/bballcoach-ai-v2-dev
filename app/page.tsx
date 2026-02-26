@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/authStore";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import {
   Activity,
   Video,
@@ -85,12 +85,12 @@ const features = [
   },
 ];
 
-const container = {
+const container: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.07 } },
 };
 
-const item = {
+const item: Variants = {
   hidden: { opacity: 0, y: 18, scale: 0.97 },
   show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 28 } },
 };
@@ -245,7 +245,7 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-full bg-neutral-950 text-white px-4 pt-6 pb-4">
+    <div className="min-h-full bg-background text-white px-4 pt-6 pb-4">
 
       {/* ── Header ── */}
       <motion.div
@@ -292,7 +292,7 @@ export default function Home() {
         className="grid grid-cols-2 gap-3 mb-6"
       >
         {/* Sessions */}
-        <motion.div variants={item} className="glass-card rounded-2xl p-4 relative overflow-hidden">
+        <motion.div variants={item} className="glass-panel hover-lift p-4 relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-30 pointer-events-none"
             style={{ background: "radial-gradient(ellipse at top-right, rgba(249,115,22,0.15), transparent 70%)" }}
@@ -310,7 +310,7 @@ export default function Home() {
         </motion.div>
 
         {/* Duration */}
-        <motion.div variants={item} className="glass-card rounded-2xl p-4 relative overflow-hidden">
+        <motion.div variants={item} className="glass-panel hover-lift p-4 relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-30 pointer-events-none"
             style={{ background: "radial-gradient(ellipse at top-right, rgba(59,130,246,0.15), transparent 70%)" }}
@@ -328,7 +328,7 @@ export default function Home() {
         </motion.div>
 
         {/* Analyses */}
-        <motion.div variants={item} className="glass-card rounded-2xl p-4 relative overflow-hidden">
+        <motion.div variants={item} className="glass-panel hover-lift p-4 relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-30 pointer-events-none"
             style={{ background: "radial-gradient(ellipse at top-right, rgba(34,197,94,0.12), transparent 70%)" }}
@@ -346,7 +346,7 @@ export default function Home() {
         </motion.div>
 
         {/* Level + XP */}
-        <motion.div variants={item} className="glass-card rounded-2xl p-4 relative overflow-hidden">
+        <motion.div variants={item} className="glass-panel hover-lift p-4 relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-30 pointer-events-none"
             style={{ background: "radial-gradient(ellipse at top-right, rgba(168,85,247,0.12), transparent 70%)" }}
@@ -403,7 +403,7 @@ export default function Home() {
                 transition={b.earned ? { type: "spring", stiffness: 400, damping: 20, delay: i * 0.08 } : {}}
                 onTouchStart={() => b.earned && setBadgeFlash(i)}
                 onTouchEnd={() => setBadgeFlash(-1)}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border transition-all duration-300 ${b.earned ? b.color : "text-neutral-700 border-neutral-800 bg-neutral-900"
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border transition-all duration-300 ${b.earned ? b.color : "text-neutral-700 border-neutral-800 bg-neutral-900"
                   } ${badgeFlash === i ? "scale-110" : "scale-100"}`}
                 style={b.earned
                   ? { background: b.bg, borderColor: b.border }
@@ -422,7 +422,7 @@ export default function Home() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="glass-card rounded-2xl p-4 mb-6"
+        className="glass-panel hover-lift p-4 mb-6"
       >
         <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">
           Activité 7 jours
@@ -436,7 +436,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="glass-card rounded-2xl p-4 mb-6"
+          className="glass-panel hover-lift p-4 mb-6"
         >
           <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2">
             Radar Performance
@@ -488,7 +488,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="glass-card rounded-2xl p-4 mb-6"
+          className="glass-panel hover-lift p-4 mb-6"
         >
           <div className="flex items-center justify-between mb-2">
             <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">
@@ -535,9 +535,8 @@ export default function Home() {
             <motion.div key={f.path} variants={item}>
               <Link
                 href={f.path}
-                className="flex items-center justify-between rounded-2xl p-4 active:scale-[0.98] transition-all duration-200 relative overflow-hidden"
+                className="glass-panel hover-lift flex items-center justify-between p-4 active:scale-[0.98] transition-all duration-300 relative overflow-hidden group"
                 style={{
-                  background: "rgba(255,255,255,0.03)",
                   border: "1px solid rgba(255,255,255,0.06)",
                 }}
               >
@@ -546,7 +545,7 @@ export default function Home() {
                   style={{ background: `radial-gradient(ellipse at 30% 50%, ${f.accent}, transparent 70%)` }}
                 />
                 <div className="flex items-center gap-4 relative">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.gradient} flex items-center justify-center ${f.glow}`}>
+                  <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${f.gradient} flex items-center justify-center ${f.glow}`}>
                     <Icon className="w-6 h-6 text-white" />
                   </div>
                   <div>
@@ -564,14 +563,13 @@ export default function Home() {
         <motion.div variants={item}>
           <Link
             href="/sessions"
-            className="flex items-center justify-between rounded-2xl p-4 active:scale-[0.98] transition-all duration-200"
+            className="glass-panel hover-lift flex items-center justify-between p-4 active:scale-[0.98] transition-all duration-300 group"
             style={{
-              background: "rgba(255,255,255,0.03)",
               border: "1px solid rgba(255,255,255,0.06)",
             }}
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-neutral-700 to-neutral-600 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-linear-to-br from-neutral-700 to-neutral-600 flex items-center justify-center">
                 <Clock className="w-6 h-6 text-white" />
               </div>
               <div>

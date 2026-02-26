@@ -42,6 +42,7 @@ const bodySchema = z.object({
         shotCount: z.number().optional(),
         madeShots: z.number().optional(),
     }).optional(),
+    coachPersona: z.enum(["supportive", "sergeant", "mamba"]).optional().default("supportive"),
     history: z.array(z.object({
         role: z.enum(["user", "model"]),
         text: z.string(),
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
             );
         }
 
-        const { prompt, frames, metrics, history } = parseResult.data;
+        const { prompt, frames, metrics, history, coachPersona } = parseResult.data;
 
         // --- Build multi-turn conversation for Gemini ---
         const contents: { role: string; parts: { text?: string; inlineData?: { data: string; mimeType: string } }[] }[] = [];
@@ -108,7 +109,18 @@ CONTEXTE SESSION:
 - Score: ${metrics.madeShots}/${metrics.shotCount}
 ` : "";
 
-        const systemInstruction = `Tu es un coach de basket-ball professionnel d'élite.
+        let personaPrompt = "Tu es un coach de basket-ball professionnel d'élite. Tu es toujours constructif, positif, et tu encourages le joueur pour le mettre en confiance.";
+        let voiceName = "Puck"; // Energetic, young male vibe, very supportive
+
+        if (coachPersona === "sergeant") {
+            personaPrompt = "Tu es un coach de basket-ball de type Sergent Instructeur. Tu es extrêmement exigeant, direct, et tu n'hésites pas à secouer le joueur d'un ton militaire. Ne sois jamais doux.";
+            voiceName = "Charon"; // Deep, authoritative, drill sergeant vibe
+        } else if (coachPersona === "mamba") {
+            personaPrompt = "Tu incarnes la Mamba Mentality. Tu parles de faim de victoire, d'obsession du détail technique, et de travail acharné sans relâche.";
+            voiceName = "Fenrir"; // Intense, driven, competitive vibe
+        }
+
+        const systemInstruction = `${personaPrompt}
 Tu analyses la biomécanique en te basant sur des images ET des données métriques précises.
 ${metricsInfo}
 
@@ -163,7 +175,7 @@ Exemple: "Le mode fantôme est activé. [ACTION:TOGGLE_GHOST]"`;
                 systemInstruction,
                 responseModalities: ["text", "audio"],
                 speechConfig: {
-                    voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } }
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } }
                 }
             }
         });

@@ -45,7 +45,7 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-[100dvh] flex items-center justify-center bg-neutral-950 px-6">
+        <div className="min-h-[100dvh] flex items-center justify-center bg-background px-6">
             <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -81,7 +81,7 @@ export default function LoginPage() {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-3.5 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-orange-500 text-white text-base"
+                            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-white text-base transition-colors"
                             required
                             autoComplete="email"
                         />
@@ -95,7 +95,7 @@ export default function LoginPage() {
                                 type={showPw ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-4 py-3.5 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-orange-500 text-white text-base pr-12"
+                                className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:bg-white/10 text-white text-base pr-12 transition-colors"
                                 required
                                 autoComplete="current-password"
                             />
