@@ -454,6 +454,53 @@ export default function Home() {
         </motion.div>
       )}
 
+      {/* ── Shot Heatmap (Hot/Cold Zones) ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.28 }}
+        className="glass-panel hover-lift p-4 mb-6"
+      >
+        <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">
+          Zones de tir (Heatmap)
+        </p>
+        <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-neutral-900 border border-white/5 flex items-end justify-center pb-2">
+          {/* Abstract Court Background */}
+          <div className="absolute inset-0 bg-[url('https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Basketball_court.svg/500px-Basketball_court.svg.png')] bg-cover bg-bottom opacity-20 pointer-events-none" />
+          <div className="absolute bottom-0 w-32 h-20 border-t-2 border-x-2 border-white/10 rounded-t-full" />
+          <div className="absolute bottom-0 inset-x-0 h-8 border-t border-white/10 bg-orange-500/5" />
+
+          {/* Mock Data Heatmap Spots */}
+          <div className="absolute bottom-[40%] left-[25%] w-8 h-8 rounded-full bg-red-500/80 blur-md" />
+          <div className="absolute bottom-[40%] left-[25%] w-4 h-4 rounded-full bg-red-400" />
+
+          <div className="absolute bottom-[30%] left-[75%] w-10 h-10 rounded-full bg-orange-500/60 blur-md" />
+          <div className="absolute bottom-[30%] left-[75%] w-5 h-5 rounded-full bg-orange-400" />
+
+          <div className="absolute top-[30%] left-[50%] -translate-x-1/2 w-12 h-12 rounded-full bg-blue-500/60 blur-md" />
+          <div className="absolute top-[30%] left-[50%] -translate-x-1/2 w-4 h-4 rounded-full bg-blue-400" />
+
+          <div className="absolute top-[40%] left-[80%] w-6 h-6 rounded-full bg-green-500/80 blur-md" />
+          <div className="absolute top-[40%] left-[80%] w-3 h-3 rounded-full bg-green-400" />
+
+          {/* Legend */}
+          <div className="absolute top-2 right-2 flex flex-col gap-1 bg-black/40 p-1.5 rounded-lg border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-[8px] font-bold text-white/70 uppercase">Échec fréquent</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <span className="text-[8px] font-bold text-white/70 uppercase">Zone Froide</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-[8px] font-bold text-white/70 uppercase">Zone Chaude</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* ── CTA Start Session ── */}
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}

@@ -24,11 +24,12 @@ import {
     type ShotPhase,
     type Landmark
 } from "@/lib/biomechanics";
-import { Mic, Square, Circle, RefreshCcw, Bot, Flame, Activity, Gauge, Zap } from "lucide-react";
+import { Mic, Square, Circle, RefreshCcw, Bot, Flame, Activity, Gauge, Zap, Target, Crosshair } from "lucide-react";
 import VoiceWaveIndicator from "./VoiceWaveIndicator";
 import VoiceAssistantModal, { type VoiceStatus } from "./VoiceAssistantModal";
 import * as THREE from "three";
 import RadarChart from "./RadarChart";
+import { vibrate } from "@/lib/utils";
 
 
 class Particle {
@@ -198,6 +199,7 @@ export default function LiveTracker() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const poseLandmarkerRef = useRef<any>(null);
+    const objectDetectorRef = useRef<any>(null);
     const poseConnectionsRef = useRef<any>(null);
     const drawingUtilsRef = useRef<any>(null);
     const requestRef = useRef<number>(0);
@@ -249,6 +251,30 @@ export default function LiveTracker() {
     // --- Elite Refs ---
     const trailPointsRef = useRef<{ x: number, y: number, life: number }[]>([]);
     const peakHipYRef = useRef<number>(1);
+
+    // --- Phase 2: Make/Miss & Gamification refs ---
+    const lastShotTimeRef = useRef<number>(0);
+    const hoopTargetRef = useRef<{ x: number, y: number, radius: number }>({ x: 0.5, y: 0.2, radius: 0.1 });
+    const [shotPositions, setShotPositions] = useState<{ x: number, y: number, made: boolean }[]>([]);
+    const [hoopMode, setHoopModeState] = useState(false);
+    const hoopModeRef = useRef(false);
+    const setHoopMode = (val: boolean) => {
+        hoopModeRef.current = val;
+        setHoopModeState(val);
+    };
+    const [drillActive, setDrillActive] = useState(false);
+    const drillActiveRef = useRef(false);
+    const drillTargetRef = useRef<{ x: number, y: number }>({ x: 0.2, y: 0.3 });
+    const [drillScore, setDrillScore] = useState(0);
+    const setDrillState = (val: boolean) => {
+        drillActiveRef.current = val;
+        setDrillActive(val);
+        if (val) {
+            setDrillScore(0);
+            drillTargetRef.current = { x: Math.random() * 0.6 + 0.2, y: Math.random() * 0.4 + 0.2 };
+        }
+    };
+    const [swishAnim, setSwishAnim] = useState(false);
 
     // --- Omniscience Refs ---
     const particlesRef = useRef<Particle[]>([]);
@@ -302,8 +328,10 @@ export default function LiveTracker() {
     }, [facingMode]);
 
     /* ─── Camera helpers ─── */
-    const toggleCamera = () =>
+    const toggleCamera = useCallback(() => {
+        vibrate(20);
         setFacingMode((p) => (p === "user" ? "environment" : "user"));
+    }, []);
 
     const stopCamera = useCallback(() => {
         if (streamRef.current) {
@@ -647,6 +675,78 @@ export default function LiveTracker() {
                 const hasBall = detectBallInHand(lm);
                 if (hasBall !== ballDetected) setBallDetected(hasBall);
 
+                // --- Phase 2: Make/Miss Detection ---
+                if (objectDetectorRef.current && hoopModeRef.current) {
+                    const objResults = objectDetectorRef.current.detectForVideo(video, nowMs);
+                    if (objResults.detections.length > 0) {
+                        const ball = objResults.detections[0].boundingBox;
+                        const nx = (ball.originX + ball.width / 2) / video.videoWidth;
+                        const ny = (ball.originY + ball.height / 2) / video.videoHeight;
+
+                        const hoop = hoopTargetRef.current;
+                        const dist = Math.sqrt(Math.pow(nx - hoop.x, 2) + Math.pow(ny - hoop.y, 2));
+
+                        if (dist < hoop.radius && (nowMs - lastShotTimeRef.current > 2000)) {
+                            setMadeShots(m => m + 1);
+                            setStreak(s => s + 1);
+                            setSwishAnim(true);
+                            vibrate([50, 50, 100]);
+                            setTimeout(() => setSwishAnim(false), 1500);
+                            if (autoFeedback) triggerEdgeAudio(coachLanguage === "fr" ? "Boom ! Dans le mille !" : "Swish!");
+                            setShotPositions(prev => [...prev, { x: nx, y: ny, made: true }]);
+                            lastShotTimeRef.current = nowMs;
+                        }
+                    }
+                    // Visual Hoop Target Overlay on canvas
+                    const hx = hoopTargetRef.current.x * w;
+                    const hy = hoopTargetRef.current.y * h;
+                    const hr = hoopTargetRef.current.radius * Math.min(w, h);
+                    ctx.beginPath();
+                    ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+                    ctx.strokeStyle = "rgba(34, 197, 94, 0.8)";
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // --- Phase 2: AR Agility Drill (Reaction) ---
+                if (drillActiveRef.current) {
+                    const rX = lm[16].x; const rY = lm[16].y; // Right wrist
+                    const lX = lm[15].x; const lY = lm[15].y; // Left wrist
+                    const target = drillTargetRef.current;
+                    const targetR = 0.08; // Target size
+
+                    const distR = Math.sqrt(Math.pow(rX - target.x, 2) + Math.pow(rY - target.y, 2));
+                    const distL = Math.sqrt(Math.pow(lX - target.x, 2) + Math.pow(lY - target.y, 2));
+
+                    if (distR < targetR || distL < targetR) {
+                        setDrillScore(s => s + 1);
+                        vibrate(40);
+                        triggerEdgeAudio(coachLanguage === "fr" ? "Bien joué !" : "Got it!");
+                        // Spawn new target
+                        drillTargetRef.current = { x: Math.random() * 0.6 + 0.2, y: Math.random() * 0.4 + 0.2 };
+
+                        // Particle explosion at target
+                        const tx = target.x * w; const ty = target.y * h;
+                        for (let i = 0; i < 8; i++) {
+                            particlesRef.current.push(new Particle(tx, ty, "#f97316"));
+                        }
+                    }
+
+                    // Draw the Drill Target
+                    const tx = target.x * w;
+                    const ty = target.y * h;
+                    const tr = targetR * Math.min(w, h);
+                    ctx.beginPath();
+                    ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(249, 115, 22, 0.4)";
+                    ctx.fill();
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = "rgba(249, 115, 22, 1)";
+                    ctx.stroke();
+                }
+
                 // Jump Height & Airtime logic
                 const currentHipY = (lm[23].y + lm[24].y) / 2;
                 if (phase === "RELEASE" || phase === "FOLLOW_THROUGH") {
@@ -868,7 +968,7 @@ export default function LiveTracker() {
         ctx.globalAlpha = 1;
 
         requestRef.current = requestAnimationFrame(predictWebcam);
-    }, [autoFeedback, triggerEdgeAudio, triggerParticles, maxJump, coachLanguage, handedness, ballDetected, triggerProactiveCoaching]);
+    }, [autoFeedback, triggerEdgeAudio, triggerParticles, maxJump, coachLanguage, handedness, ballDetected, triggerProactiveCoaching, setDrillScore]);
 
 
 
@@ -1002,7 +1102,7 @@ export default function LiveTracker() {
         const initMP = async () => {
             try {
                 const mp = await import("@mediapipe/tasks-vision");
-                const { PoseLandmarker, FilesetResolver, DrawingUtils } = mp;
+                const { PoseLandmarker, ObjectDetector, FilesetResolver, DrawingUtils } = mp;
 
                 poseConnectionsRef.current = PoseLandmarker.POSE_CONNECTIONS;
 
@@ -1022,8 +1122,19 @@ export default function LiveTracker() {
                     minTrackingConfidence: 0.5,
                 });
 
+                const od = await ObjectDetector.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    scoreThreshold: 0.3,
+                    categoryAllowlist: ["sports ball"]
+                });
+
                 if (active) {
                     poseLandmarkerRef.current = pl;
+                    objectDetectorRef.current = od;
                     if (canvasRef.current) {
                         const ctx = canvasRef.current.getContext("2d");
                         if (ctx) drawingUtilsRef.current = new DrawingUtils(ctx);
@@ -1250,11 +1361,21 @@ export default function LiveTracker() {
         setIsRecording(false);
     };
 
+    const handleCanvasClick = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        if (!hoopModeRef.current) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        const y = (e.clientY - rect.top) / rect.height;
+        hoopTargetRef.current = { x, y, radius: 0.1 };
+        vibrate(10);
+        addToast(coachLanguage === "fr" ? "Arceau ciblé !" : "Hoop Target Set!", "success");
+    };
+
     /* ─── Render ─── */
     return (
         <div className="relative w-full h-full overflow-hidden bg-black font-sans text-white">
-            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none" autoPlay playsInline muted />
-            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" />
+            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none" autoPlay playsInline muted onLoadedData={predictWebcam} />
+            <canvas ref={canvasRef} onPointerDown={handleCanvasClick} className="absolute inset-0 w-full h-full object-cover" />
 
             {/* --- V11 Elite: 3D Analytical Ghost --- */}
             <ThreeGhost landmarks={currentLandmarks} visible={ghostMode} />
@@ -1315,25 +1436,53 @@ export default function LiveTracker() {
                 )}
             </AnimatePresence>
 
+            {/* --- Phase 2: Swish Overlay UI --- */}
+            <AnimatePresence>
+                {swishAnim && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.2, rotate: -20 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                        exit={{ opacity: 0, scale: 1.5, rotate: 10 }}
+                        transition={{ type: "spring", damping: 12, stiffness: 200 }}
+                        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none"
+                    >
+                        <span className="text-7xl font-black italic text-green-500 uppercase tracking-tighter" style={{
+                            textShadow: "0px 0px 30px rgba(34,197,94,0.8), 0px 0px 10px rgba(255,255,255,0.5)"
+                        }}>
+                            +1 Swish
+                        </span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Elite HUD Overlays */}
             <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none p-4 md:p-6 flex flex-col justify-between items-stretch z-10">
                 {/* Header Metrics */}
                 <div className="flex justify-between items-start">
                     <div className="glass-panel p-4 rounded-3xl flex items-center gap-6 shadow-2xl">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-white/50 font-semibold uppercase tracking-wider">Session XP</span>
-                            <div className="flex items-center gap-2 mt-1">
-                                <Flame className="text-orange-400" size={18} />
-                                <span className="text-2xl font-bold tabular-nums tracking-tight">{madeShots * 150 + shotCount * 50}</span>
+                        {drillActive ? (
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-orange-400/80 font-semibold uppercase tracking-wider">Réaction Drill Score</span>
+                                <span className="text-3xl font-black tabular-nums tracking-tight text-orange-400">{drillScore}</span>
                             </div>
-                        </div>
-                        <div className="h-10 w-px bg-white/10" />
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-white/50 font-semibold uppercase tracking-widest">Accuracy</span>
-                            <span className="text-2xl font-bold tabular-nums text-blue-400 tracking-tight mt-1">
-                                {shotCount > 0 ? Math.round((madeShots / shotCount) * 100) : 0}%
-                            </span>
-                        </div>
+                        ) : (
+                            <>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] text-white/50 font-semibold uppercase tracking-wider">Session XP</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Flame className="text-orange-400" size={18} />
+                                        <span className="text-2xl font-bold tabular-nums tracking-tight">{madeShots * 150 + shotCount * 50}</span>
+                                    </div>
+                                </div>
+                                <div className="h-10 w-px bg-white/10" />
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] text-white/50 font-semibold uppercase tracking-widest">Accuracy</span>
+                                    <span className="text-2xl font-bold tabular-nums text-blue-400 tracking-tight mt-1">
+                                        {shotCount > 0 ? Math.round((madeShots / shotCount) * 100) : 0}%
+                                    </span>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div className="flex flex-col items-end gap-3">
@@ -1365,24 +1514,39 @@ export default function LiveTracker() {
                 <div className="flex justify-between items-end pb-24">
                     {/* V13: Compact vs Full HUD */}
                     {compactHUD ? (
-                        /* ── COMPACT HUD ── */
-                        <motion.div
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="glass-panel p-4 rounded-3xl flex items-center gap-6 shadow-xl"
-                        >
-                            <ScoreRing value={poseScore} color={scoreColorVal} label="Form" />
-                            <div className="h-10 w-px bg-white/10" />
-                            <div className="flex flex-col items-center">
-                                <span className="text-[9px] text-white/50 font-semibold uppercase tracking-wider mb-1">Shots</span>
-                                <span className="text-xl font-bold text-orange-400 tabular-nums">{madeShots}/{shotCount}</span>
-                            </div>
-                            <div className="h-10 w-px bg-white/10" />
-                            <div className="flex flex-col items-center">
-                                <span className="text-[9px] text-white/50 font-semibold uppercase tracking-wider mb-1">Phase</span>
-                                <span className="text-xs font-bold uppercase text-blue-400 tracking-wider">{currentPhase}</span>
-                            </div>
-                        </motion.div>
+                        /* ── COMPACT HUD and MINIMAP ── */
+                        <div className="flex gap-4 items-end">
+                            <motion.div
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="glass-panel p-4 rounded-3xl flex items-center gap-6 shadow-xl"
+                            >
+                                <ScoreRing value={poseScore} color={scoreColorVal} label="Form" />
+                                <div className="h-10 w-px bg-white/10" />
+                                <div className="flex flex-col items-center">
+                                    <span className="text-[9px] text-white/50 font-semibold uppercase tracking-wider mb-1">Shots</span>
+                                    <span className="text-xl font-bold text-orange-400 tabular-nums">{madeShots}/{shotCount}</span>
+                                </div>
+                            </motion.div>
+
+                            {/* Phase 2: Live Minimap */}
+                            {shotPositions.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="w-24 h-24 glass-panel rounded-2xl relative overflow-hidden border border-white/10"
+                                >
+                                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-4 border border-orange-500/50 rounded-t-full rounded-b-md opacity-30" />
+                                    {shotPositions.map((pos, i) => (
+                                        <div
+                                            key={i}
+                                            className={`absolute w-2 h-2 rounded-full -translate-x-1/2 -translate-y-1/2 ${pos.made ? 'bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]'}`}
+                                            style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
+                                        />
+                                    ))}
+                                </motion.div>
+                            )}
+                        </div>
                     ) : (
                         /* ── FULL HUD ── */
                         <div className="flex flex-col gap-4">
@@ -1478,21 +1642,38 @@ export default function LiveTracker() {
             </div>
 
             {/* Bottom Master Controls */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-8 z-30 pointer-events-auto">
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 z-30 pointer-events-auto">
                 <motion.button
                     whileHover={{ scale: 1.15 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={toggleCamera}
-                    className="p-4 glass-modern border border-white/10 rounded-full text-white/40 hover:text-white transition-colors"
+                    className="p-3 glass-modern border border-white/10 rounded-full text-white/40 hover:text-white transition-colors"
                 >
-                    <RefreshCcw size={22} />
+                    <RefreshCcw size={20} />
+                </motion.button>
+                <motion.button
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => { vibrate(20); setHoopMode(!hoopMode); }}
+                    className={`p-3 glass-modern border rounded-full transition-colors flex items-center gap-1 ${hoopMode ? 'border-green-500/50 text-green-400 bg-green-500/10' : 'border-white/10 text-white/40 hover:text-white'}`}
+                >
+                    <Target size={20} />
+                </motion.button>
+
+                <motion.button
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => { vibrate(20); setDrillState(!drillActive); }}
+                    className={`p-3 glass-modern border rounded-full transition-colors flex items-center gap-1 ${drillActive ? 'border-orange-500/50 text-orange-400 bg-orange-500/10' : 'border-white/10 text-white/40 hover:text-white'}`}
+                >
+                    <Crosshair size={20} />
                 </motion.button>
 
                 <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={!isRecording ? startRecording : stopRecording}
-                    className={`p-6 rounded-full text-white transition-all duration-500 shadow-2xl relative ${!isRecording ? 'bg-orange-600' : 'bg-red-600'}`}
+                    onClick={() => { vibrate(30); if (!isRecording) startRecording(); else stopRecording(); }}
+                    className={`p-5 rounded-full text-white transition-all duration-500 shadow-2xl relative mx-2 ${!isRecording ? 'bg-orange-600' : 'bg-red-600'}`}
                 >
                     {!isRecording ? <Circle size={32} className="fill-current" /> : <Square size={32} className="fill-current" />}
                     {isRecording && <div className="absolute inset-0 rounded-full border-4 border-white/20 animate-ping" />}

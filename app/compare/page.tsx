@@ -3,7 +3,7 @@
 import React, { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
-import { Layers, Loader2, CheckCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Layers, Loader2, CheckCircle, ChevronDown, ChevronUp, Pause, Play, Settings2 } from "lucide-react";
 
 const PRO_VIDEOS = [
     { name: "Steph Curry — Tir 3pts", id: "curry_3pt" },
@@ -20,9 +20,73 @@ export default function ComparePage() {
     const [analysisResult, setAnalysisResult] = useState("");
     const [analyzing, setAnalyzing] = useState(false);
     const [showAnalysis, setShowAnalysis] = useState(true);
+
+    // --- V14: Timeline Scrubber State ---
+    const [unifiedProgress, setUnifiedProgress] = useState(0);
+    const [syncOffset, setSyncOffset] = useState(0);
+    const [isPlaying, setIsPlaying] = useState(false);
+
     const userVideoRef = useRef<HTMLVideoElement>(null);
     const proVideoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Synchronized playback
+    React.useEffect(() => {
+        let animationFrame: number;
+
+        const updateProgress = () => {
+            if (userVideoRef.current && proVideoRef.current && isPlaying) {
+                const uDur = userVideoRef.current.duration || 1;
+                const pDur = proVideoRef.current.duration || 1;
+                const percent = (userVideoRef.current.currentTime / uDur) * 100;
+                setUnifiedProgress(percent);
+
+                // Enforce sync
+                let expectedProTime = userVideoRef.current.currentTime + syncOffset;
+                expectedProTime = Math.max(0, Math.min(expectedProTime, pDur));
+
+                if (Math.abs(proVideoRef.current.currentTime - expectedProTime) > 0.1) {
+                    proVideoRef.current.currentTime = expectedProTime;
+                }
+            }
+            animationFrame = requestAnimationFrame(updateProgress);
+        };
+
+        if (isPlaying) {
+            updateProgress();
+        }
+        return () => cancelAnimationFrame(animationFrame);
+    }, [isPlaying, syncOffset]);
+
+    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = Number(e.target.value);
+        setUnifiedProgress(val);
+        if (userVideoRef.current) {
+            const uDur = userVideoRef.current.duration || 1;
+            const targetTime = (val / 100) * uDur;
+            userVideoRef.current.currentTime = targetTime;
+
+            if (proVideoRef.current) {
+                const pDur = proVideoRef.current.duration || 1;
+                let proTime = targetTime + syncOffset;
+                proTime = Math.max(0, Math.min(proTime, pDur));
+                proVideoRef.current.currentTime = proTime;
+            }
+        }
+    };
+
+    const togglePlay = () => {
+        if (!userVideoRef.current || !proVideoRef.current) return;
+        if (isPlaying) {
+            userVideoRef.current.pause();
+            proVideoRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            userVideoRef.current.play();
+            proVideoRef.current.play();
+            setIsPlaying(true);
+        }
+    };
 
     const handleUserUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
@@ -194,23 +258,26 @@ export default function ComparePage() {
                 {isOverlay ? (
                     <>
                         {userVideo && (
-                            <video
-                                ref={userVideoRef}
-                                src={userVideo}
-                                controls
-                                playsInline
-                                className="absolute top-0 left-0 w-full h-full object-contain"
-                            />
+                            <div className="absolute inset-0">
+                                <video
+                                    ref={userVideoRef}
+                                    src={userVideo}
+                                    playsInline
+                                    muted
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
                         )}
                         {proVideo && (
-                            <video
-                                ref={proVideoRef}
-                                src={proVideo}
-                                controls
-                                playsInline
-                                className="absolute top-0 left-0 w-full h-full object-contain pointer-events-none"
-                                style={{ opacity: opacity / 100 }}
-                            />
+                            <div className="absolute inset-0 z-10 pointer-events-none" style={{ opacity: opacity / 100 }}>
+                                <video
+                                    ref={proVideoRef}
+                                    src={proVideo}
+                                    playsInline
+                                    muted
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
                         )}
                     </>
                 ) : (
@@ -219,8 +286,8 @@ export default function ComparePage() {
                             <video
                                 ref={userVideoRef}
                                 src={userVideo}
-                                controls
                                 playsInline
+                                muted
                                 className="w-full border-b border-neutral-800"
                             />
                         )}
@@ -228,8 +295,8 @@ export default function ComparePage() {
                             <video
                                 ref={proVideoRef}
                                 src={proVideo}
-                                controls
                                 playsInline
+                                muted
                                 className="w-full"
                             />
                         )}
@@ -237,8 +304,48 @@ export default function ComparePage() {
                 )}
             </div>
 
+            {/* Timeline Scrubber */}
+            {(userVideo && proVideo) && (
+                <div className="glass-panel p-4 mb-6 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between text-xs text-neutral-400 font-bold uppercase tracking-wider mb-2">
+                        <span>Timeline Master</span>
+                        <span>{Math.round(unifiedProgress)}%</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button onClick={togglePlay} className="p-3 rounded-full bg-blue-500/20 text-blue-400 hover:bg-blue-500/40 transition">
+                            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                        </button>
+                        <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={0.1}
+                            value={unifiedProgress}
+                            onChange={handleSeek}
+                            className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                    </div>
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs text-neutral-400">
+                            <Settings2 className="w-4 h-4" />
+                            <span>Décalage Pro (Sync)</span>
+                        </div>
+                        <input
+                            type="range"
+                            min={-2}
+                            max={2}
+                            step={0.05}
+                            value={syncOffset}
+                            onChange={(e) => setSyncOffset(Number(e.target.value))}
+                            className="w-24 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                        />
+                        <span className="text-xs font-mono text-orange-400 w-8 text-right">{syncOffset > 0 ? "+" : ""}{syncOffset.toFixed(2)}s</span>
+                    </div>
+                </div>
+            )}
+
             {/* Compare button */}
-            {userVideo && proVideo && (
+            {(userVideo && proVideo) && (
                 <button
                     onClick={runComparison}
                     disabled={analyzing}
