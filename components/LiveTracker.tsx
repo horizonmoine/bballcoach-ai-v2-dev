@@ -199,7 +199,6 @@ export default function LiveTracker() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const poseLandmarkerRef = useRef<any>(null);
-    const objectDetectorRef = useRef<any>(null);
     const poseConnectionsRef = useRef<any>(null);
     const drawingUtilsRef = useRef<any>(null);
     const requestRef = useRef<number>(0);
@@ -237,6 +236,7 @@ export default function LiveTracker() {
     const [voiceConfidence, setVoiceConfidence] = useState(0);
     const [fpsDisplay, setFpsDisplay] = useState(0);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isAnalyzingShot, setIsAnalyzingShot] = useState(false);
     const [currentLandmarks, setCurrentLandmarks] = useState<Landmark[] | null>(null);
     // --- V13: New Feature States ---
     const [followThroughScore, setFollowThroughScore] = useState(0);
@@ -322,6 +322,7 @@ export default function LiveTracker() {
     const shotSnapshotsRef = useRef<ShotSnapshot[]>([]);
     // --- V13: Last phase for transition detection ---
     const lastPhaseRef = useRef<string>("IDLE");
+    const captureShotAnalysisTimeRef = useRef<number | null>(null);
 
     useEffect(() => {
         facingModeRef.current = facingMode;
@@ -485,6 +486,46 @@ export default function LiveTracker() {
         }
     }, [coachLanguage, coachPersona, maxJump, airtime, releaseAngle, kneeBendDepth, shotCount, madeShots, processSpeechQueue, setGhostMode, setCoachPersona, triggerEdgeAudio, addToast]);
 
+    const analyzeShotWithGemini = useCallback(async (imageBase64: string) => {
+        setIsAnalyzingShot(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const res = await fetch("/api/analyze-shot", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    image: imageBase64,
+                    coachLanguage
+                })
+            });
+            const data = await res.json();
+
+            if (data.isMake) {
+                setMadeShots(m => m + 1);
+                setStreak(s => s + 1);
+                setSwishAnim(true);
+                vibrate([50, 50, 100]);
+                setTimeout(() => setSwishAnim(false), 1500);
+            } else {
+                setStreak(0);
+            }
+
+            if (autoFeedback && data.coachAdvice) {
+                triggerEdgeAudio(data.coachAdvice);
+            }
+
+        } catch (err) {
+            console.error("Shot analysis failed:", err);
+        } finally {
+            setIsAnalyzingShot(false);
+        }
+    }, [coachLanguage, autoFeedback, triggerEdgeAudio]);
+
     // --- V12: Proactive Event-Triggered Coaching ---
     const triggerProactiveCoaching = useCallback((event: "bad_shot" | "record_jump" | "idle_too_long") => {
         const now = Date.now();
@@ -562,6 +603,14 @@ export default function LiveTracker() {
                 const h = canvas.height;
                 const dt = nowMs - (lastFrameTimeRef.current || nowMs);
                 lastFrameTimeRef.current = nowMs;
+
+                if (captureShotAnalysisTimeRef.current && nowMs >= captureShotAnalysisTimeRef.current) {
+                    captureShotAnalysisTimeRef.current = null;
+                    if (!isAnalyzingShot) {
+                        const frame = canvas.toDataURL("image/jpeg", 0.6);
+                        analyzeShotWithGemini(frame);
+                    }
+                }
 
                 // --- Neural Pulse Phase ---
                 pulsePhaseRef.current = (pulsePhaseRef.current + 0.08) % (Math.PI * 2);
@@ -645,6 +694,11 @@ export default function LiveTracker() {
                         // Store shot data for recall
                         lastShotDataRef.current = { kneeAngle: Math.round(kneeAngle), elbowAngle: Math.round(elbowAngle), score: shotScore };
                         followThroughFramesRef.current = 0;
+
+                        // Trigger Gemini analysis 1.5 seconds later to capture ball near hoop
+                        if (hoopModeRef.current) {
+                            captureShotAnalysisTimeRef.current = nowMs + 1500;
+                        }
                     }
                     if (phase === "FOLLOW_THROUGH") {
                         if (nowMs - lastProactiveTriggerRef.current > 60000) {
@@ -675,29 +729,9 @@ export default function LiveTracker() {
                 const hasBall = detectBallInHand(lm);
                 if (hasBall !== ballDetected) setBallDetected(hasBall);
 
-                // --- Phase 2: Make/Miss Detection ---
-                if (objectDetectorRef.current && hoopModeRef.current) {
-                    const objResults = objectDetectorRef.current.detectForVideo(video, nowMs);
-                    if (objResults.detections.length > 0) {
-                        const ball = objResults.detections[0].boundingBox;
-                        const nx = (ball.originX + ball.width / 2) / video.videoWidth;
-                        const ny = (ball.originY + ball.height / 2) / video.videoHeight;
-
-                        const hoop = hoopTargetRef.current;
-                        const dist = Math.sqrt(Math.pow(nx - hoop.x, 2) + Math.pow(ny - hoop.y, 2));
-
-                        if (dist < hoop.radius && (nowMs - lastShotTimeRef.current > 2000)) {
-                            setMadeShots(m => m + 1);
-                            setStreak(s => s + 1);
-                            setSwishAnim(true);
-                            vibrate([50, 50, 100]);
-                            setTimeout(() => setSwishAnim(false), 1500);
-                            if (autoFeedback) triggerEdgeAudio(coachLanguage === "fr" ? "Boom ! Dans le mille !" : "Swish!");
-                            setShotPositions(prev => [...prev, { x: nx, y: ny, made: true }]);
-                            lastShotTimeRef.current = nowMs;
-                        }
-                    }
-                    // Visual Hoop Target Overlay on canvas
+                // --- Visual Hoop Target Overlay on canvas ---
+                if (hoopModeRef.current) {
+                    // Gemini handles Make/Miss detection visually now
                     const hx = hoopTargetRef.current.x * w;
                     const hy = hoopTargetRef.current.y * h;
                     const hr = hoopTargetRef.current.radius * Math.min(w, h);
@@ -708,6 +742,19 @@ export default function LiveTracker() {
                     ctx.setLineDash([5, 5]);
                     ctx.stroke();
                     ctx.setLineDash([]);
+
+                    // Show analyzing animation
+                    if (isAnalyzingShot) {
+                        ctx.beginPath();
+                        ctx.arc(hx, hy, hr + 0.02 * Math.min(w, h), 0, Math.PI * 2);
+                        ctx.strokeStyle = "rgba(59, 130, 246, 0.8)"; // Blue
+                        ctx.lineWidth = 2;
+                        const dashOffset = (performance.now() / 20) % 30;
+                        ctx.setLineDash([10, 10]);
+                        ctx.lineDashOffset = -dashOffset;
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
                 }
 
                 // --- Phase 2: AR Agility Drill (Reaction) ---
@@ -1102,7 +1149,7 @@ export default function LiveTracker() {
         const initMP = async () => {
             try {
                 const mp = await import("@mediapipe/tasks-vision");
-                const { PoseLandmarker, ObjectDetector, FilesetResolver, DrawingUtils } = mp;
+                const { PoseLandmarker, FilesetResolver, DrawingUtils } = mp;
 
                 poseConnectionsRef.current = PoseLandmarker.POSE_CONNECTIONS;
 
@@ -1122,19 +1169,8 @@ export default function LiveTracker() {
                     minTrackingConfidence: 0.5,
                 });
 
-                const od = await ObjectDetector.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
-                        delegate: "GPU"
-                    },
-                    runningMode: "VIDEO",
-                    scoreThreshold: 0.3,
-                    categoryAllowlist: ["sports ball"]
-                });
-
                 if (active) {
                     poseLandmarkerRef.current = pl;
-                    objectDetectorRef.current = od;
                     if (canvasRef.current) {
                         const ctx = canvasRef.current.getContext("2d");
                         if (ctx) drawingUtilsRef.current = new DrawingUtils(ctx);
