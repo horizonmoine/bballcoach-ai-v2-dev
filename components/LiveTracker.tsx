@@ -510,9 +510,16 @@ export default function LiveTracker() {
 
                 if (captureShotAnalysisTimeRef.current && nowMs >= captureShotAnalysisTimeRef.current) {
                     captureShotAnalysisTimeRef.current = null;
-                    if (!isAnalyzingShot) {
-                        const frame = canvas.toDataURL("image/jpeg", 0.6);
-                        analyzeShotWithGemini(frame);
+                    if (!isAnalyzingShot && canvasRef.current) {
+                        canvasRef.current.toBlob((blob) => {
+                            if (!blob) return;
+                            const reader = new FileReader();
+                            reader.readAsDataURL(blob);
+                            reader.onloadend = () => {
+                                const base64data = reader.result as string;
+                                analyzeShotWithGemini(base64data);
+                            };
+                        }, "image/jpeg", 0.6);
                     }
                 }
 
@@ -540,9 +547,16 @@ export default function LiveTracker() {
                     if (phase === "DIP" || phase === "SET" || phase === "RELEASE") {
                         // Rapid 3-frame burst capture during key transitions
                         if (canvasRef.current) {
-                            const frame = canvasRef.current.toDataURL("image/jpeg", 0.5);
-                            frameBuffer.current.push(frame);
-                            if (frameBuffer.current.length > 15) frameBuffer.current = frameBuffer.current.slice(-15);
+                            canvasRef.current.toBlob((blob) => {
+                                if (!blob) return;
+                                const reader = new FileReader();
+                                reader.readAsDataURL(blob);
+                                reader.onloadend = () => {
+                                    const base64data = reader.result as string;
+                                    frameBuffer.current.push(base64data);
+                                    if (frameBuffer.current.length > 15) frameBuffer.current = frameBuffer.current.slice(-15);
+                                };
+                            }, "image/jpeg", 0.5);
                         }
                     }
 
@@ -959,9 +973,17 @@ export default function LiveTracker() {
         // V13: Skip capture during IDLE phase (Frame Buffer Intelligence)
         const currentPh = lastPhaseRef.current;
         if (currentPh === "IDLE") return; // Don't waste buffer on idle
-        const frame = canvasRef.current.toDataURL("image/jpeg", 0.5);
-        frameBuffer.current.push(frame);
-        if (frameBuffer.current.length > 15) frameBuffer.current = frameBuffer.current.slice(-15);
+
+        canvasRef.current.toBlob((blob) => {
+            if (!blob) return;
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = () => {
+                const base64data = reader.result as string;
+                frameBuffer.current.push(base64data);
+                if (frameBuffer.current.length > 15) frameBuffer.current = frameBuffer.current.slice(-15);
+            };
+        }, "image/jpeg", 0.5);
     }, []);
 
 
