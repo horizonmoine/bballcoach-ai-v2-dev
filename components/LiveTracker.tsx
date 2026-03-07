@@ -1037,7 +1037,7 @@ export default function LiveTracker() {
         }
     }, []);
 
-    /* ─── Init MediaPipe ─── */
+    /* ─── Init MediaPipe (Run Once) ─── */
     useEffect(() => {
         let active = true;
         let wakeLock: any = null;
@@ -1080,28 +1080,54 @@ export default function LiveTracker() {
                         if (ctx) drawingUtilsRef.current = new DrawingUtils(ctx);
                     }
                     setIsReady(true);
-                    startCamera();
                 }
             } catch (err) {
                 console.error("MediaPipe init error:", err);
                 addToast("Erreur d'initialisation MediaPipe.", "error");
             }
         };
-        initMP();
 
-        const bufferInterval = setInterval(captureFrameToBuffer, 1000);
+        initMP();
 
         return () => {
             active = false;
-            clearInterval(bufferInterval);
-            stopCamera();
             stopAutoFeedback();
             cancelAnimationFrame(requestRef.current);
             poseLandmarkerRef.current?.close();
             if (wakeLock) wakeLock.release().catch(() => { });
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [facingMode, captureFrameToBuffer]);
+    }, []);
+
+    /* ─── Camera Lifecycle & Visibility Auto-Resume ─── */
+    useEffect(() => {
+        if (!isReady) return;
+
+        // 1) Start camera as soon as MP is ready or facingMode changes
+        startCamera();
+
+        // 2) Handle mobile OS freezing camera when app goes to background
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                startCamera();
+            } else {
+                stopCamera();
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            stopCamera(); // Cleanup stream when component entirely unmounts
+        };
+    }, [isReady, facingMode, startCamera, stopCamera]);
+
+    /* ─── Background Frame Buffering ─── */
+    useEffect(() => {
+        const bufferInterval = setInterval(captureFrameToBuffer, 1000);
+        return () => clearInterval(bufferInterval);
+    }, [captureFrameToBuffer]);
 
     // Manage auto feedback based on toggle
     useEffect(() => {
