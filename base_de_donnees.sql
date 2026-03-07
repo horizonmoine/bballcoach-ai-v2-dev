@@ -18,6 +18,12 @@ CREATE TABLE sessions (
     user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
     video_url TEXT NOT NULL,
     duration_seconds INTEGER NOT NULL,
+    avg_score INTEGER,
+    avg_stability INTEGER,
+    avg_explosivity INTEGER,
+    avg_consistency INTEGER,
+    max_jump REAL,
+    total_shots INTEGER,
     ai_feedback_summary TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -57,5 +63,8 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('user_uploads', 'user_upl
 
 CREATE POLICY "Public read sessions" ON storage.objects FOR SELECT USING (bucket_id = 'sessions_videos');
 CREATE POLICY "Auth insert sessions" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'sessions_videos' AND auth.uid() IS NOT NULL);
+CREATE POLICY "Auth delete sessions" ON storage.objects FOR DELETE USING (bucket_id = 'sessions_videos' AND auth.uid() = owner);
+
 CREATE POLICY "Public read uploads" ON storage.objects FOR SELECT USING (bucket_id = 'user_uploads');
 CREATE POLICY "Auth insert uploads" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'user_uploads' AND auth.uid() IS NOT NULL);
+CREATE POLICY "Auth delete uploads" ON storage.objects FOR DELETE USING (bucket_id = 'user_uploads' AND auth.uid() = owner);

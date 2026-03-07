@@ -124,6 +124,7 @@ export default function TrainingPage() {
                                     <div className="w-full aspect-video bg-black">
                                         <iframe
                                             src={`https://www.youtube.com/embed/${item.videoId}`}
+                                            loading="lazy"
                                             title={item.name}
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                             allowFullScreen

@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { Layers, Loader2, CheckCircle, ChevronDown, ChevronUp, Pause, Play, Settings2 } from "lucide-react";
+import { extractFramesFromVideo } from "@/lib/video-utils";
 
 const PRO_VIDEOS = [
     { name: "Steph Curry — Tir 3pts", id: "curry_3pt" },
@@ -99,36 +100,7 @@ export default function ComparePage() {
             setProVideo(URL.createObjectURL(e.target.files[0]));
     };
 
-    const extractFramesFromVideo = async (
-        videoEl: HTMLVideoElement,
-    ): Promise<string[]> => {
-        const canvas = canvasRef.current;
-        if (!canvas) return [];
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return [];
-        const frames: string[] = [];
 
-        return new Promise((resolve) => {
-            const dur = videoEl.duration;
-            if (!dur || !isFinite(dur)) { resolve([]); return; }
-
-            let i = 0;
-            const times = Array.from({ length: 6 }, (_, idx) => (dur / 6) * (idx + 1));
-
-            const seekNext = () => {
-                if (i >= times.length) { resolve(frames); return; }
-                videoEl.currentTime = times[i];
-            };
-
-            videoEl.onseeked = () => {
-                ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-                frames.push(canvas.toDataURL("image/jpeg", 0.6));
-                i++;
-                seekNext();
-            };
-            seekNext();
-        });
-    };
 
     const runComparison = async () => {
         if (!userVideoRef.current || !proVideoRef.current) return;
@@ -136,9 +108,10 @@ export default function ComparePage() {
         setAnalysisResult("");
 
         try {
+            if (!canvasRef.current) return;
             const [userFrames, proFrames] = await Promise.all([
-                extractFramesFromVideo(userVideoRef.current),
-                extractFramesFromVideo(proVideoRef.current),
+                extractFramesFromVideo(userVideoRef.current, canvasRef.current, 6),
+                extractFramesFromVideo(proVideoRef.current, canvasRef.current, 6),
             ]);
 
             const allFrames = [...userFrames, ...proFrames];
@@ -208,7 +181,7 @@ export default function ComparePage() {
                                 key={v.id}
                                 className="text-xs bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-1.5 text-neutral-300 active:bg-neutral-700"
                                 onClick={() => {
-                                    /* TODO: load from CDN */
+                                    alert("Les vidéos pro pré-chargées seront bientôt disponibles. En attendant, veuillez utiliser le bouton d'upload ci-dessus.");
                                 }}
                             >
                                 {v.name}

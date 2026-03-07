@@ -15,6 +15,7 @@ import {
     ChevronDown,
     ChevronUp,
 } from "lucide-react";
+import { extractFramesFromVideo } from "@/lib/video-utils";
 
 interface UploadRecord {
     id: string;
@@ -53,30 +54,7 @@ export default function AnalyzePage() {
         if (e.target.files?.[0]) setFile(e.target.files[0]);
     };
 
-    const extractFramesFromVideo = async (url: string): Promise<string[]> => {
-        return new Promise((resolve) => {
-            const video = videoRef.current;
-            const canvas = canvasRef.current;
-            if (!video || !canvas) { resolve([]); return; }
-            const frames: string[] = [];
-            const ctx = canvas.getContext("2d");
-            video.crossOrigin = "anonymous";
-            video.src = url;
-            video.onloadeddata = async () => {
-                const dur = video.duration;
-                if (!dur || !isFinite(dur)) { resolve([]); return; }
-                for (let i = 1; i <= 8; i++) {
-                    video.currentTime = (dur / 8) * i;
-                    await new Promise<void>((r) => { video.onseeked = () => r(); });
-                    if (ctx) {
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        frames.push(canvas.toDataURL("image/jpeg", 0.6));
-                    }
-                }
-                resolve(frames);
-            };
-        });
-    };
+
 
     const processUpload = async () => {
         if (!file) return;
@@ -101,7 +79,8 @@ export default function AnalyzePage() {
             let prompt: string;
 
             if (file.type.startsWith("video/")) {
-                frames = await extractFramesFromVideo(publicUrl);
+                if (!videoRef.current || !canvasRef.current) throw new Error("Refs manquant");
+                frames = await extractFramesFromVideo(videoRef.current, canvasRef.current, 8, { url: publicUrl, crossOrigin: "anonymous" });
                 prompt = "Analyse biomécanique complète de cette vidéo. Examine la base, le transfert d'énergie, le release point et le suivi.";
             } else {
                 const base64 = await new Promise<string>((resolve) => {

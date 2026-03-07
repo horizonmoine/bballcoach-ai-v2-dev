@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, Inter } from "next/font/google";
 import "./globals.css";
+import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
+import OfflineBanner from "@/components/OfflineBanner";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -52,6 +54,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </head>
       <body className="bg-[#050505] text-neutral-100 font-sans selection:bg-orange-500/30 selection:text-orange-200 overscroll-none antialiased">
+        <OfflineBanner />
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

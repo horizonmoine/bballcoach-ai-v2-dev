@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 
 interface WeeklyActivityBarProps {
@@ -11,12 +12,12 @@ interface WeeklyActivityBarProps {
 
 const DEFAULT_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
 
-export default function WeeklyActivityBar({
+const WeeklyActivityBar = ({
     data,
     labels = DEFAULT_LABELS,
     maxValue,
     color = "#f97316",
-}: WeeklyActivityBarProps) {
+}: WeeklyActivityBarProps) => {
     const max = maxValue || Math.max(...data, 1);
 
     return (
@@ -55,3 +56,5 @@ export default function WeeklyActivityBar({
         </div>
     );
 }
+
+export default React.memo(WeeklyActivityBar);

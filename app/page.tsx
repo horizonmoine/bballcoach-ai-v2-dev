@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatDuration } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/authStore";
 import { motion, AnimatePresence, Variants } from "framer-motion";
@@ -192,11 +193,7 @@ export default function Home() {
     fetchStats();
   }, [user]);
 
-  const formatDuration = (s: number) => {
-    if (s < 60) return `${s}s`;
-    if (s < 3600) return `${Math.floor(s / 60)}min`;
-    return `${Math.floor(s / 3600)}h${Math.floor((s % 3600) / 60)}m`;
-  };
+
 
   const level = Math.floor(stats.totalDuration / 3600) + 1;
   const xpProgress = (stats.totalDuration % 3600) / 36;
@@ -466,18 +463,16 @@ export default function Home() {
         </p>
         <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-neutral-900 border border-white/5 flex items-end justify-center pb-2">
           {/* Abstract Court Background */}
-          <div className="absolute inset-0 bg-[url('https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Basketball_court.svg/500px-Basketball_court.svg.png')] bg-cover bg-bottom opacity-20 pointer-events-none" />
+          <div className="absolute inset-0 bg-[url('/court-bg.png')] bg-cover bg-bottom opacity-20 pointer-events-none" />
           <div className="absolute bottom-0 w-32 h-20 border-t-2 border-x-2 border-white/10 rounded-t-full" />
           <div className="absolute bottom-0 inset-x-0 h-8 border-t border-white/10 bg-orange-500/5" />
 
-          {/* Mock Data Heatmap Spots */}
-          <div className="absolute bottom-[40%] left-[25%] w-8 h-8 rounded-full bg-red-500/80 blur-md" />
-          <div className="absolute bottom-[40%] left-[25%] w-4 h-4 rounded-full bg-red-400" />
-
-          <div className="absolute bottom-[30%] left-[75%] w-10 h-10 rounded-full bg-orange-500/60 blur-md" />
-          <div className="absolute bottom-[30%] left-[75%] w-5 h-5 rounded-full bg-orange-400" />
-
-          <div className="absolute top-[30%] left-[50%] -translate-x-1/2 w-12 h-12 rounded-full bg-blue-500/60 blur-md" />
+          {/* Coming Soon Overlay */}
+          <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm bg-black/40">
+            <span className="px-4 py-2 bg-orange-600/80 border border-orange-500/50 rounded-full text-xs font-black uppercase tracking-widest shadow-xl">
+              Bientôt disponible
+            </span>
+          </div>
           <div className="absolute top-[30%] left-[50%] -translate-x-1/2 w-4 h-4 rounded-full bg-blue-400" />
 
           <div className="absolute top-[40%] left-[80%] w-6 h-6 rounded-full bg-green-500/80 blur-md" />

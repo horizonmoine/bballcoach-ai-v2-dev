@@ -46,6 +46,10 @@ export default function UniversalCoachFAB() {
                 body: JSON.stringify({
                     prompt: `CONTEXT: Tu es un coach de basket expert. Réponds à cette question théorique de l'utilisateur de manière concise et motivante. QUESTION: ${userMsg}`,
                     frames: [], // No frames for theoretical chat
+                    history: messages.map(m => ({
+                        role: m.role === "coach" ? "model" : "user",
+                        parts: [{ text: m.text }]
+                    }))
                 }),
             });
 

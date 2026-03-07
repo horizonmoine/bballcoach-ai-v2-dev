@@ -14,6 +14,7 @@ import {
     ChevronDown,
     ChevronUp,
 } from "lucide-react";
+import { formatDuration } from "@/lib/format";
 
 interface Session {
     id: string;
@@ -162,10 +163,7 @@ export default function SessionsPage() {
         }
     };
 
-    const formatDuration = (s: number) => {
-        if (s < 60) return `${s}s`;
-        return `${Math.floor(s / 60)}m ${s % 60}s`;
-    };
+
 
     return (
         <div className="min-h-full bg-background text-white px-4 pt-6 pb-4">

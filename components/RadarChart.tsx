@@ -9,12 +9,12 @@ interface RadarChartProps {
     size?: number;
 }
 
-export default function RadarChart({
+const RadarChart = ({
     labels,
     data,
     color = "#f97316",
     size = 220,
-}: RadarChartProps) {
+}: RadarChartProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animProgress = useRef(0);
     const animFrame = useRef(0);
@@ -162,3 +162,5 @@ function hexToRgba(hex: string, alpha: number): string {
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r},${g},${b},${alpha})`;
 }
+
+export default React.memo(RadarChart);

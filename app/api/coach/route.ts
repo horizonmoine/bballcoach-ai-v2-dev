@@ -2,34 +2,19 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
+import { env } from "@/lib/env";
 
-const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+const client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/* ─── Simple in-memory rate limiter ─── */
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 10; // max requests
-const RATE_WINDOW = 60_000; // per minute
-
-function isRateLimited(userId: string): boolean {
-    const now = Date.now();
-    const entry = rateLimitMap.get(userId);
-
-    if (!entry || now > entry.resetAt) {
-        rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_WINDOW });
-        return false;
-    }
-
-    entry.count++;
-    return entry.count > RATE_LIMIT;
-}
+import { isRateLimited } from "@/lib/rate-limit";
 
 /* ─── Zod schema ─── */
 const bodySchema = z.object({
     prompt: z.string().min(1, "Le prompt est requis.").max(2000),
     frames: z
-        .array(z.string())
+        .array(z.string().max(5_000_000, "Frame trop volumineuse."))
         .max(20, "Maximum 20 images.")
         .default([]),
     metrics: z.object({
