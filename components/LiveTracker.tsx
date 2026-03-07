@@ -143,7 +143,6 @@ export default function LiveTracker() {
     const [fpsDisplay, setFpsDisplay] = useState(0);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isAnalyzingShot, setIsAnalyzingShot] = useState(false);
-    const [currentLandmarks, setCurrentLandmarks] = useState<Landmark[] | null>(null);
     // --- V13: New Feature States ---
     const [followThroughScore, setFollowThroughScore] = useState(0);
     const [handedness, setHandedness] = useState<HandednessResult>({ hand: "right", confidence: 0, votes: [] });
@@ -227,6 +226,8 @@ export default function LiveTracker() {
     // --- V13: Last phase for transition detection ---
     const lastPhaseRef = useRef<string>("IDLE");
     const captureShotAnalysisTimeRef = useRef<number | null>(null);
+    const lastScoreUpdateTimeRef = useRef<number>(0);
+    const currentLandmarksRef = useRef<Landmark[] | null>(null);
 
     useEffect(() => {
         facingModeRef.current = facingMode;
@@ -872,8 +873,12 @@ export default function LiveTracker() {
                 const EMA_ALPHA = 0.15;
                 emaRef.current.score = emaRef.current.score * (1 - EMA_ALPHA) + rawScore * EMA_ALPHA;
                 emaRef.current.stability = emaRef.current.stability * (1 - EMA_ALPHA) + rawStability * EMA_ALPHA;
-                setPoseScore(Math.round(emaRef.current.score));
-                setStabilityScore(Math.round(emaRef.current.stability));
+
+                if (nowMs - lastScoreUpdateTimeRef.current > 150) {
+                    setPoseScore(Math.round(emaRef.current.score));
+                    setStabilityScore(Math.round(emaRef.current.stability));
+                    lastScoreUpdateTimeRef.current = nowMs;
+                }
 
                 // --- Neural-Mastery: Ambient Proactive Tips ---
                 if (rawScore > 90 && Math.random() > 0.98) {
@@ -881,7 +886,7 @@ export default function LiveTracker() {
                 }
 
                 // --- V11: Elite Visual Data Sync ---
-                setCurrentLandmarks(lm);
+                currentLandmarksRef.current = lm;
 
                 // Update Hand Trail (Elite Arc)
                 const rightWrist = lm[16];
@@ -1372,7 +1377,7 @@ export default function LiveTracker() {
             <canvas ref={canvasRef} onPointerDown={handleCanvasClick} className="absolute inset-0 w-full h-full object-cover" />
 
             {/* --- V11 Elite: 3D Analytical Ghost --- */}
-            <ThreeGhost landmarks={currentLandmarks} visible={ghostMode} />
+            <ThreeGhost landmarksRef={currentLandmarksRef} visible={ghostMode} />
 
             {/* V13: Edge Flash on Phase Transition */}
             <AnimatePresence>

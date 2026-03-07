@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { type Landmark } from "@/lib/biomechanics";
 import { Activity } from "lucide-react";
 
-export default function ThreeGhost({ landmarks, visible }: { landmarks: Landmark[] | null, visible: boolean }) {
+export default function ThreeGhost({ landmarksRef, visible }: { landmarksRef: React.MutableRefObject<Landmark[] | null>, visible: boolean }) {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<{ scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, lines: THREE.LineSegments } | null>(null);
 
@@ -48,6 +48,31 @@ export default function ThreeGhost({ landmarks, visible }: { landmarks: Landmark
         const animate = () => {
             if (!sceneRef.current) return;
             requestAnimationFrame(animate);
+
+            // V13: Pull landmarks from ref asynchronously instead of relying on React props/state re-renders !
+            const landmarks = landmarksRef.current;
+            if (landmarks && landmarks.length >= 33) {
+                const { lines } = sceneRef.current;
+                const positions: number[] = [];
+
+                // Manual connections for a cleaner look
+                const connections = [
+                    [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], // Upper
+                    [11, 23], [12, 24], [23, 24], // Torso
+                    [23, 25], [25, 27], [24, 26], [26, 28] // Lower
+                ];
+
+                connections.forEach(([i1, i2]) => {
+                    const p1 = landmarks[i1];
+                    const p2 = landmarks[i2];
+                    // Normalize & Center (MediaPipe 0,0 is top-left, 3D 0,0 is center)
+                    positions.push((p1.x - 0.5) * 2, -(p1.y - 0.5) * 2, (p1.z || 0) * 2);
+                    positions.push((p2.x - 0.5) * 2, -(p2.y - 0.5) * 2, (p2.z || 0) * 2);
+                });
+
+                lines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            }
+
             renderer.render(scene, camera);
         };
         animate();
@@ -59,31 +84,7 @@ export default function ThreeGhost({ landmarks, visible }: { landmarks: Landmark
             renderer.dispose();
             sceneRef.current = null;
         };
-    }, []);
-
-    useEffect(() => {
-        if (!sceneRef.current || !landmarks || landmarks.length < 33) return;
-        const { lines } = sceneRef.current;
-        const positions: number[] = [];
-
-        // Manual connections for a cleaner look
-        const connections = [
-            [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], // Upper
-            [11, 23], [12, 24], [23, 24], // Torso
-            [23, 25], [25, 27], [24, 26], [26, 28] // Lower
-        ];
-
-        connections.forEach(([i1, i2]) => {
-            const p1 = landmarks[i1];
-            const p2 = landmarks[i2];
-            // Normalize & Center (MediaPipe 0,0 is top-left, 3D 0,0 is center)
-            positions.push((p1.x - 0.5) * 2, -(p1.y - 0.5) * 2, (p1.z || 0) * 2);
-            positions.push((p2.x - 0.5) * 2, -(p2.y - 0.5) * 2, (p2.z || 0) * 2);
-        });
-
-        lines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        lines.geometry.attributes.position.needsUpdate = true;
-    }, [landmarks]);
+    }, [landmarksRef]);
 
     if (!visible) return null;
 
