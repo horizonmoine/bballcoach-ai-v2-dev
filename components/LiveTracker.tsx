@@ -149,6 +149,12 @@ export default function LiveTracker() {
     const [consistencyScore, setConsistencyScore] = useState(0);
     const [showRadar, setShowRadar] = useState(false);
     const [ballDetected, setBallDetected] = useState(false);
+    // --- Perf: Refs for values read inside rAF loop (avoid stale closure re-renders) ---
+    const handednessRef = useRef<HandednessResult>({ hand: "right", confidence: 0, votes: [] });
+    const ballDetectedRef = useRef(false);
+    const maxJumpRef = useRef(0);
+    const isAnalyzingShotRef = useRef(false);
+    const followThroughScoreRef = useRef(0);
     const [compactHUD, setCompactHUD] = useState(false);
     const [phasePopup, setPhasePopup] = useState<string | null>(null);
     const [edgeFlash, setEdgeFlash] = useState(false);
